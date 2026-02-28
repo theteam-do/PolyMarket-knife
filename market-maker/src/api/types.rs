@@ -44,13 +44,6 @@ pub struct OrderResponse {
     pub signature: Option<String>,
 }
 
-/// 订单簿请求
-#[derive(Debug, Clone, Serialize)]
-pub struct OrderBookRequest {
-    #[serde(rename = "token_id")]
-    pub token_id: String,
-}
-
 /// 订单簿响应
 #[derive(Debug, Clone, Deserialize)]
 pub struct OrderBookResponse {
@@ -82,17 +75,3 @@ pub struct CancelOrderResponse {
     pub order_id: String,
 }
 
-/// API 错误
-#[derive(Debug, Clone, Deserialize)]
-pub struct ApiError {
-    pub error: String,
-    pub code: Option<String>,
-}
-
-impl std::fmt::Display for ApiError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "API Error: {}", self.error)
-    }
-}
-
-impl std::error::Error for ApiError {}

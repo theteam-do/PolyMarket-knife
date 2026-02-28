@@ -19,3 +19,4 @@ polymarket-client-sdk.workspace = true
 config.workspace = true
 tokio-tungstenite.workspace = true
 futures-util.workspace = true
+reqwest.workspace = true

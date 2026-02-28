@@ -145,9 +145,21 @@ impl OrderClient {
 
     /// 取消所有订单
     pub async fn cancel_all(&self) -> Result<Vec<String>> {
-        // TODO: 获取所有订单并取消
-        warn!("cancel_all not fully implemented");
-        Ok(vec![])
+        let orders = self.get_orders(None).await?;
+        if orders.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let mut cancelled = Vec::new();
+        for order in orders {
+            match self.cancel_order(&order.order_id).await {
+                Ok(resp) if resp.success => cancelled.push(resp.order_id),
+                Ok(resp) => warn!("cancel_all: order {} cancel returned false", resp.order_id),
+                Err(e) => warn!("cancel_all: failed to cancel {}: {}", order.order_id, e),
+            }
+        }
+
+        Ok(cancelled)
     }
 
     /// 获取用户订单

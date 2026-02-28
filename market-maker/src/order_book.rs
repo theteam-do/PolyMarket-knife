@@ -1,8 +1,6 @@
 //! 订单簿模块
 
 use polymarket_client_sdk::types::Decimal;
-use rust_decimal_macros::dec;
-use std::str::FromStr;
 
 #[derive(Debug, Clone)]
 pub struct Level {

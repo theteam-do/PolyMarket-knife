@@ -1,8 +1,6 @@
 //! 报价引擎
 
 use crate::config::StrategyConfig;
-use rust_decimal::Decimal;
-use rust_decimal_macros::dec;
 
 pub struct Quoter {
     spread_bps: f64,

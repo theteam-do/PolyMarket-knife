@@ -43,6 +43,9 @@ impl Detector {
 
     pub fn detect(&self, prices: &[MarketPrice]) -> Option<ArbOpportunity> {
         for market in prices {
+            if market.volume_24h <= Decimal::ZERO {
+                continue;
+            }
             let sum = market.yes_price + market.no_price;
 
             if sum <= dec!(0.01) {

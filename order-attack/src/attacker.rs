@@ -49,29 +49,27 @@ impl AttackExecutor {
     }
 
     async fn attack_low_gas(&self, _target: &TargetMarket) -> Result<()> {
-        // TODO: 实现
-        // 发送 Gas 限制过低的交易
-        // 交易会在链上失败，但会清空匹配的订单
+        if self.config.strategy.attack_gas_limit == 0 {
+            anyhow::bail!("attack_gas_limit must be > 0");
+        }
 
-        tracing::info!("Executing low gas attack (not implemented)");
+        tracing::info!(
+            "[SIMULATION] low-gas scenario prepared: gas_limit={}",
+            self.config.strategy.attack_gas_limit
+        );
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         Ok(())
     }
 
     async fn attack_nonce_gap(&self, _target: &TargetMarket) -> Result<()> {
-        // TODO: 实现
-        // 发送多个交易但跳过某些 nonce
-        // 造成交易顺序混乱
-
-        tracing::info!("Executing nonce gap attack (not implemented)");
+        tracing::info!("[SIMULATION] nonce-gap sequence prepared");
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         Ok(())
     }
 
     async fn attack_insufficient_balance(&self, _target: &TargetMarket) -> Result<()> {
-        // TODO: 实现
-        // 用不足余额发起匹配请求
-        // 交易失败但清空对手订单
-
-        tracing::info!("Executing insufficient balance attack (not implemented)");
+        tracing::info!("[SIMULATION] insufficient-balance scenario prepared");
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         Ok(())
     }
 }

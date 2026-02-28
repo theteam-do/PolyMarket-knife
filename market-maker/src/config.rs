@@ -17,7 +17,7 @@ pub struct Config {
 #[derive(Debug, Deserialize, Clone)]
 pub struct PolygonConfig {
     pub rpc_url: String,
-    #[serde(skip)]
+    #[serde(default)]
     pub private_key: String,
 }
 
@@ -57,8 +57,12 @@ impl Config {
         let content = std::fs::read_to_string(path)
             .with_context(|| "Failed to read config file")?;
         
-        let config: Config = toml::from_str(&content)
+        let mut config: Config = toml::from_str(&content)
             .with_context(|| "Failed to parse config file")?;
+
+        if config.polygon.private_key.is_empty() {
+            config.polygon.private_key = std::env::var("POLYMARKET_PRIVATE_KEY").unwrap_or_default();
+        }
         
         // 验证配置
         config.validate()?;
@@ -126,5 +130,112 @@ impl Config {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Config;
+    use std::fs;
+    use std::sync::Mutex;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    fn restore_env(original: Option<String>) {
+        if let Some(value) = original {
+            std::env::set_var("POLYMARKET_PRIVATE_KEY", value);
+        } else {
+            std::env::remove_var("POLYMARKET_PRIVATE_KEY");
+        }
+    }
+
+    fn write_temp_config(contents: &str) -> String {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time went backwards")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("mm-config-{}.toml", nanos));
+        fs::write(&path, contents).expect("failed to write temp config");
+        path.to_string_lossy().to_string()
+    }
+
+    #[test]
+    fn load_uses_private_key_from_file() {
+        let _guard = ENV_LOCK.lock().expect("env lock poisoned");
+        let original_env = std::env::var("POLYMARKET_PRIVATE_KEY").ok();
+        std::env::remove_var("POLYMARKET_PRIVATE_KEY");
+
+        let path = write_temp_config(
+            r#"
+[polygon]
+rpc_url = "https://polygon-rpc.com"
+private_key = "0xabc"
+
+[clob]
+host = "https://clob.polymarket.com"
+
+[strategy]
+market_ids = ["1"]
+spread_bps = 100
+order_size_usd = 100.0
+refresh_interval_ms = 100
+skew_inventory = true
+min_spread_bps = 50
+max_spread_bps = 200
+
+[risk]
+max_position_usd = 1000.0
+max_loss_per_day = 100.0
+stop_loss_pct = 5.0
+max_orders = 10
+max_order_size_usd = 500.0
+"#,
+        );
+
+        let cfg = Config::load(&path).expect("config should load");
+        assert_eq!(cfg.polygon.private_key, "0xabc");
+
+        let _ = fs::remove_file(path);
+        restore_env(original_env);
+    }
+
+    #[test]
+    fn load_falls_back_to_env_private_key() {
+        let _guard = ENV_LOCK.lock().expect("env lock poisoned");
+        let original_env = std::env::var("POLYMARKET_PRIVATE_KEY").ok();
+        std::env::set_var("POLYMARKET_PRIVATE_KEY", "0xenv");
+
+        let path = write_temp_config(
+            r#"
+[polygon]
+rpc_url = "https://polygon-rpc.com"
+
+[clob]
+host = "https://clob.polymarket.com"
+
+[strategy]
+market_ids = ["1"]
+spread_bps = 100
+order_size_usd = 100.0
+refresh_interval_ms = 100
+skew_inventory = true
+min_spread_bps = 50
+max_spread_bps = 200
+
+[risk]
+max_position_usd = 1000.0
+max_loss_per_day = 100.0
+stop_loss_pct = 5.0
+max_orders = 10
+max_order_size_usd = 500.0
+"#,
+        );
+
+        let cfg = Config::load(&path).expect("config should load");
+        assert_eq!(cfg.polygon.private_key, "0xenv");
+
+        let _ = fs::remove_file(path);
+        restore_env(original_env);
     }
 }

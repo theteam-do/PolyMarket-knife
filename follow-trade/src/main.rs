@@ -86,6 +86,17 @@ impl Follower {
             // 3. 执行跟单
             match self.copier.copy(&trade).await {
                 Ok(profit) => {
+                    let copied_notional = trade.size_usd * self.config.strategy.copy_ratio;
+                    self.risk_manager
+                        .update_position(&trade.market_id, copied_notional);
+                    self.risk_manager
+                        .update_pnl(profit.to_string().parse::<f64>().unwrap_or(0.0));
+                    info!(
+                        "Risk updated: market={} copied_notional=${:.2} total_position=${:.2}",
+                        trade.market_id,
+                        copied_notional,
+                        self.risk_manager.total_position_value()
+                    );
                     return Ok(Some(profit));
                 }
                 Err(e) => {
@@ -99,6 +110,7 @@ impl Follower {
 
     pub fn stop(&mut self) {
         self.running = false;
+        self.risk_manager.reset_daily();
     }
 }
 

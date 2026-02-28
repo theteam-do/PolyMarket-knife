@@ -2,7 +2,6 @@
 
 use crate::alerts::AlertManager;
 use crate::metrics::Metrics;
-use std::net::SocketAddr;
 
 pub struct Dashboard {
     metrics: Metrics,

@@ -1,7 +1,7 @@
 //! 套利策略配置
 
 use anyhow::Result;
-use polymarket_client_sdk::types::Decimal;
+use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde::Deserialize;
 use std::path::Path;
@@ -16,13 +16,15 @@ pub struct Config {
 #[derive(Debug, Deserialize, Clone)]
 pub struct PolygonConfig {
     pub rpc_url: String,
-    #[serde(skip)]
+    #[serde(default)]
     pub private_key: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ClobConfig {
     pub host: String,
+    pub api_key: Option<String>,
+    pub api_secret: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -52,7 +54,10 @@ impl StrategyConfig {
 impl Config {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let content = std::fs::read_to_string(path)?;
-        let config: Config = toml::from_str(&content)?;
+        let mut config: Config = toml::from_str(&content)?;
+        if config.polygon.private_key.is_empty() {
+            config.polygon.private_key = std::env::var("POLYMARKET_PRIVATE_KEY").unwrap_or_default();
+        }
         Ok(config)
     }
 }

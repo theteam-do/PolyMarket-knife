@@ -3,8 +3,6 @@
 use prometheus::{Counter, Encoder, Gauge, Histogram, Registry, TextEncoder};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use std::io::Write;
-use std::sync::Arc;
 use std::time::Instant;
 
 pub struct Metrics {

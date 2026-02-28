@@ -1,7 +1,5 @@
 //! 风控管理器 - 生产级实现
 
-use rust_decimal::Decimal;
-use rust_decimal_macros::dec;
 use std::collections::HashMap;
 use tracing::info;
 
@@ -52,6 +50,9 @@ impl RiskManager {
 
     /// 检查是否可以交易
     pub fn can_trade(&self) -> bool {
+        let _ = self.config.stop_loss_pct;
+        let _ = self.config.max_orders;
+
         if !self.can_trade_flag {
             return false;
         }

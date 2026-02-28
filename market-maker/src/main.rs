@@ -1,11 +1,13 @@
 //! Market Maker - 生产级主程序
 
 use anyhow::{Context, Result};
+use rust_decimal::Decimal;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 
+mod api;
 mod config;
 mod executor;
 mod metrics;
@@ -72,20 +74,30 @@ impl MarketMaker {
 
         let mut tick_count = 0u64;
         while self.running {
-            interval.tick().await;
-
-            match self.tick().await {
-                Ok(_) => {
-                    tick_count += 1;
-                    if tick_count % 100 == 0 {
-                        info!("Processed {} ticks", tick_count);
+            tokio::select! {
+                _ = tokio::signal::ctrl_c() => {
+                    info!("Shutdown signal received");
+                    self.stop();
+                }
+                _ = interval.tick() => {
+                    match self.tick().await {
+                        Ok(_) => {
+                            tick_count += 1;
+                            if tick_count % 100 == 0 {
+                                info!("Processed {} ticks", tick_count);
+                            }
+                        }
+                        Err(e) => {
+                            error!("Tick error: {}", e);
+                            self.metrics.record_order(OrderStatus::Failed);
+                        }
                     }
                 }
-                Err(e) => {
-                    error!("Tick error: {}", e);
-                    self.metrics.record_order(OrderStatus::Failed);
-                }
             }
+        }
+
+        if let Err(e) = self.executor.cancel_all_orders().await {
+            warn!("Failed to cancel all orders during shutdown: {}", e);
         }
 
         info!("Market Maker stopped after {} ticks", tick_count);
@@ -117,14 +129,82 @@ impl MarketMaker {
     /// 更新市场报价
     async fn update_market(&mut self, market_id: &str) -> Result<()> {
         // 获取订单簿
-        let _order_book = self.executor.fetch_orderbook(market_id).await?;
+        let order_book = self.executor.fetch_orderbook(market_id).await?;
 
-        // TODO: 计算新报价并下单
-        // let (bid, ask) = self.quoter.calculate_quotes(&order_book);
-        // let (buy_id, sell_id) = self.executor.place_orders(market_id, bid, ask).await?;
-        
-        // 记录指标
-        self.metrics.record_order(OrderStatus::Filled);
+        // 计算中间价
+        let mid_price = order_book.mid_price().unwrap_or(0.50);
+        let spread = order_book.spread().unwrap_or(0.0);
+        let spread_bps = order_book.spread_bps().unwrap_or(0);
+        let _mid_decimal = order_book.mid_price_decimal();
+        let top_bid_size = order_book.bids.first().map(|l| l.size).unwrap_or(0.0);
+        let top_ask_size = order_book.asks.first().map(|l| l.size).unwrap_or(0.0);
+        info!(
+            "Market {} top-of-book: mid={:.4} spread={:.4} ({} bps) bid_size={:.2} ask_size={:.2}",
+            order_book.token_id,
+            mid_price,
+            spread,
+            spread_bps,
+            top_bid_size,
+            top_ask_size
+        );
+
+        // 计算新报价
+        let (bid, ask) = self.quoter.calculate_quotes(mid_price);
+        let order_size = self.quoter.order_size();
+
+        // 风控检查
+        {
+            let risk = self.risk_manager.lock().await;
+            if !risk.can_place_order(market_id, order_size) {
+                warn!("Risk check failed for market {}", market_id);
+                return Ok(());
+            }
+        }
+
+        // 下双边订单
+        match self.executor.place_orders(market_id, bid, ask).await? {
+            (Some(buy_id), Some(sell_id)) => {
+                info!("Orders placed for {}: buy={}, sell={}", market_id, buy_id, sell_id);
+                self.metrics.record_order(OrderStatus::Filled);
+                self.metrics
+                    .record_volume(Decimal::from_f64_retain(order_size).unwrap_or(Decimal::ZERO) * Decimal::from(2));
+                self.metrics.record_pnl(Decimal::ZERO);
+                
+                // 更新风控持仓
+                let mut risk = self.risk_manager.lock().await;
+                risk.update_position(market_id, order_size, order_size, mid_price);
+                risk.update_volume(order_size * 2.0);
+                info!(
+                    "Risk state: market={} total_position={:.2} daily_volume={:.2}",
+                    market_id,
+                    risk.total_position_value(),
+                    risk.daily_volume()
+                );
+                if let Some(pos) = risk.get_position(market_id) {
+                    info!(
+                        "Position {} => yes={:.2} no={:.2} avg_cost={:.4}",
+                        market_id,
+                        pos.yes_size,
+                        pos.no_size,
+                        pos.avg_cost
+                    );
+                }
+            }
+            (None, None) => {
+                warn!("Both orders failed for market {}", market_id);
+                self.metrics.record_order(OrderStatus::Failed);
+                let mut risk = self.risk_manager.lock().await;
+                risk.update_pnl(-0.01);
+                self.metrics.record_pnl(Decimal::new(-1, 2));
+            }
+            (Some(order_id), None) | (None, Some(order_id)) => {
+                warn!("Partial fill for market {}. Cancelling surviving order {}", market_id, order_id);
+                self.metrics.record_order(OrderStatus::Cancelled);
+                if let Err(e) = self.executor.cancel_orders(&order_id).await {
+                    warn!("Failed to cancel surviving order {}: {}", order_id, e);
+                }
+            }
+        }
 
         Ok(())
     }
@@ -132,6 +212,13 @@ impl MarketMaker {
     /// 停止做市商
     pub fn stop(&mut self) {
         self.running = false;
+        if let Ok(mut risk) = self.risk_manager.try_lock() {
+            risk.stop_trading();
+            risk.reset_daily();
+            risk.resume_trading();
+            info!("Risk reset on stop, daily_pnl={:.2}", risk.daily_pnl());
+        }
+        self.metrics.reset_daily();
         info!("Stopping Market Maker...");
     }
 }
@@ -191,15 +278,7 @@ async fn main() -> Result<()> {
     // 创建并运行做市商
     let mut mm = MarketMaker::new(config).await?;
 
-    // 处理关闭信号
-    let shutdown_handle = tokio::spawn(async move {
-        tokio::signal::ctrl_c().await.unwrap();
-        info!("Shutdown signal received");
-    });
-
     mm.run().await?;
-
-    shutdown_handle.abort();
 
     Ok(())
 }

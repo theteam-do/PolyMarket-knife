@@ -3,8 +3,7 @@ use serde::Serialize;
 
 use anyhow::{Context, Result};
 use reqwest::{Client, Response, StatusCode};
-use rust_decimal::Decimal;
-use tracing::{debug, error, info, instrument};
+use tracing::{debug, error, instrument};
 
 use super::types::*;
 use super::signer::OrderSigner;
@@ -18,6 +17,14 @@ pub struct ClobClient {
 }
 
 impl ClobClient {
+    fn with_auth(&self, builder: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        if let Some(key) = &self.api_key {
+            builder.header("X-Api-Key", key)
+        } else {
+            builder
+        }
+    }
+
     /// 创建新的客户端
     pub fn new(host: &str, api_key: Option<String>, private_key: Option<String>) -> Result<Self> {
         let client = Client::builder()
@@ -46,8 +53,8 @@ impl ClobClient {
         
         debug!("Fetching orderbook from: {}", url);
         
-        let response = self.client
-            .get(&url)
+        let response = self.with_auth(self.client
+            .get(&url))
             .send()
             .await
             .context("Failed to send orderbook request")?;
@@ -65,8 +72,8 @@ impl ClobClient {
         
         debug!("Placing order: {:?}", signed_request);
         
-        let response = self.client
-            .post(&url)
+        let response = self.with_auth(self.client
+            .post(&url))
             .json(&signed_request)
             .send()
             .await
@@ -86,8 +93,8 @@ impl ClobClient {
         
         debug!("Cancelling order: {}", order_id);
         
-        let response = self.client
-            .post(&url)
+        let response = self.with_auth(self.client
+            .post(&url))
             .json(&request)
             .send()
             .await
@@ -108,8 +115,8 @@ impl ClobClient {
         
         debug!("Cancelling all orders for market: {:?}", market);
         
-        let response = self.client
-            .post(&url)
+        let response = self.with_auth(self.client
+            .post(&url))
             .json(&request)
             .send()
             .await

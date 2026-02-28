@@ -1,7 +1,5 @@
 //! 信号生成器
 
-use rust_decimal::Decimal;
-use rust_decimal_macros::dec;
 use std::collections::VecDeque;
 
 use crate::config::StrategyConfig;

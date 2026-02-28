@@ -12,8 +12,10 @@ use config::Config;
 use detector::Detector;
 use executor::Executor;
 use scanner::Scanner;
+use tokio::time::{sleep, Duration};
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
@@ -28,10 +30,24 @@ fn main() -> Result<()> {
         .unwrap_or_else(|| "config/arbitrage.toml".to_string());
 
     let config = Config::load(&config_path).context("Failed to load config")?;
+    info!(
+        "Config loaded: rpc_url={}, gas_price_gwei={}",
+        config.polygon.rpc_url, config.strategy.gas_price_gwei
+    );
 
-    let _scanner = Scanner::new(&config);
-    let _detector = Detector::new(&config.strategy);
-    let _executor = Executor::new(&config);
+    let scanner = Scanner::new(&config);
+    let detector = Detector::new(&config.strategy);
+    let executor = Executor::new(&config);
+
+    let markets = scanner.scan().await?;
+    if let Some(opportunity) = detector.detect(&markets) {
+        let expected_profit = executor.execute(&opportunity).await?;
+        info!("Opportunity executed: {} expected_profit={}", opportunity, expected_profit);
+    } else {
+        info!("No arbitrage opportunity found");
+    }
+
+    sleep(Duration::from_millis(detector.scan_interval_ms())).await;
 
     info!("Arbitrage initialized");
 

@@ -86,7 +86,8 @@ fn parse_trade(text: &str) -> Option<PriceTick> {
         s: String,
         p: String,
         q: String,
-        T: u64,
+        #[serde(rename = "T")]
+        t: u64,
     }
 
     let trade: BinanceTrade = serde_json::from_str(text).ok()?;
@@ -101,7 +102,7 @@ fn parse_trade(text: &str) -> Option<PriceTick> {
     Some(PriceTick {
         symbol: trade.s,
         price,
-        timestamp: trade.T,
+        timestamp: trade.t,
         volume,
     })
 }

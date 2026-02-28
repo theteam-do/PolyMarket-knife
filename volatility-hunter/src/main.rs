@@ -99,10 +99,12 @@ impl Hunter {
             // 3. 执行交易
             match self.executor.execute(&signal).await {
                 Ok(profit) => {
+                    self.risk_manager.update_pnl(profit);
                     return Ok(Some(profit));
                 }
                 Err(e) => {
                     warn!("Execution failed: {}", e);
+                    self.risk_manager.update_pnl(rust_decimal::Decimal::ZERO);
                 }
             }
         }
@@ -112,6 +114,7 @@ impl Hunter {
 
     pub fn stop(&mut self) {
         self.running = false;
+        self.risk_manager.reset_daily();
     }
 }
 

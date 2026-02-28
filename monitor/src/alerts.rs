@@ -1,10 +1,9 @@
 //! 告警管理
 
-use anyhow::Result;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use std::time::{Duration, Instant};
-use tracing::{error, info, warn};
+use tracing::{error, warn};
 
 /// 告警管理器
 pub struct AlertManager {

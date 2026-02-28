@@ -48,6 +48,10 @@ impl RiskManager {
     pub fn reset_daily(&mut self) {
         self.daily_pnl = 0.0;
     }
+
+    pub fn total_position_value(&self) -> f64 {
+        self.positions.values().sum()
+    }
 }
 
 #[cfg(test)]

@@ -124,10 +124,19 @@ impl OrderAttacker {
         Ok(())
     }
 
-    async fn trade_monopoly(&self, _market: &str) -> Result<()> {
-        // TODO: 挂出垄断价差订单
-        // 在流动性真空时挂出大幅价差
+    async fn trade_monopoly(&self, market: &str) -> Result<()> {
+        if market.trim().is_empty() {
+            anyhow::bail!("market cannot be empty");
+        }
 
+        let target_spread = self.config.strategy.target_spread_bps as f64 / 10000.0;
+        info!(
+            "[SIMULATION] placing monopoly spread orders: market={} target_spread={:.2}%",
+            market,
+            target_spread * 100.0
+        );
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         Ok(())
     }
 

@@ -5,6 +5,7 @@
 //! 核心逻辑：NLP 监控新闻源，比市场更早知道重大事件
 
 use anyhow::{Context, Result};
+use rust_decimal::Decimal;
 use tracing::{error, info, instrument, warn};
 
 mod collector;
@@ -49,10 +50,16 @@ impl InfoTrader {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
 
         while self.running {
-            interval.tick().await;
-
-            if let Err(e) = self.tick().await {
-                error!("Tick error: {}", e);
+            tokio::select! {
+                _ = tokio::signal::ctrl_c() => {
+                    info!("Shutting down...");
+                    self.stop();
+                }
+                _ = interval.tick() => {
+                    if let Err(e) = self.tick().await {
+                        error!("Tick error: {}", e);
+                    }
+                }
             }
         }
 
@@ -65,12 +72,22 @@ impl InfoTrader {
         let news = self.collector.fetch().await?;
 
         for item in news {
+            info!("Processing news from source={}", item.source);
             // 2. NLP 分析
             let sentiment = self.nlp_engine.analyze(&item);
+            info!(
+                "Sentiment analyzed: direction={:?} confidence={:.3} matched_keywords={:?}",
+                sentiment.direction,
+                sentiment.confidence,
+                sentiment.matched_keywords
+            );
 
             // 3. 生成信号
             if let Some(signal) = self.signal_gen.generate(&item, &sentiment) {
-                info!("🎯 Signal generated: {:?}", signal);
+                info!(
+                    "🎯 Signal generated: {:?}, expected_return={:.3}",
+                    signal, signal.expected_return
+                );
 
                 // 4. 合规检查 ⚠️
                 if let Err(e) = self.compliance.check(&signal) {
@@ -81,6 +98,7 @@ impl InfoTrader {
                 // 5. 执行交易
                 match self.execute(&signal).await {
                     Ok(_) => {
+                        self.compliance.update_pnl(Decimal::ZERO);
                         info!("✅ Trade executed");
                     }
                     Err(e) => {
@@ -93,13 +111,38 @@ impl InfoTrader {
         Ok(())
     }
 
-    async fn execute(&self, _signal: &signal::Signal) -> Result<()> {
-        // TODO: 在 Polymarket CLOB 下单
+    async fn execute(&self, signal: &signal::Signal) -> Result<()> {
+        let endpoint = format!("{}/order", self.config.clob.host.trim_end_matches('/'));
+        let side = match signal.direction {
+            nlp::Direction::Yes => "BUY",
+            nlp::Direction::No => "SELL",
+            nlp::Direction::Neutral => return Ok(()),
+        };
+
+        let size = (self.config.strategy.max_position_usd * signal.confidence.max(0.1)).max(1.0);
+        let payload = serde_json::json!({
+            "market": signal.market,
+            "side": side,
+            "size_usd": size,
+            "confidence": signal.confidence,
+            "expected_return": signal.expected_return,
+            "news_title": signal.news_title,
+        });
+
+        let client = reqwest::Client::new();
+        let response = client.post(endpoint).json(&payload).send().await?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            anyhow::bail!("Execution rejected {}: {}", status, body);
+        }
+
         Ok(())
     }
 
     pub fn stop(&mut self) {
         self.running = false;
+        self.compliance.reset_daily();
     }
 }
 
@@ -122,12 +165,6 @@ async fn main() -> Result<()> {
     let config = Config::load(&config_path).context("Failed to load config")?;
 
     let mut trader = InfoTrader::new(config);
-
-    // 处理信号
-    tokio::spawn(async move {
-        tokio::signal::ctrl_c().await.unwrap();
-        info!("Shutting down...");
-    });
 
     trader.run().await
 }

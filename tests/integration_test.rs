@@ -1,7 +1,5 @@
 //! 集成测试
 
-use std::time::Duration;
-
 /// 测试市场制作器启动
 #[tokio::test]
 async fn test_market_maker_starts() {

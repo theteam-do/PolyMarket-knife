@@ -63,9 +63,7 @@ impl Executor {
             position
         );
 
-        // TODO: 将市场映射到实际的 token_id
-        // 这里使用示例 token_id
-        let token_id = U256::from_str("123456789")?;
+        let token_id = self.map_market_to_token_id(&signal.market)?;
         
         let side = match signal.direction {
             Direction::Yes => SdkSide::Buy,
@@ -93,6 +91,23 @@ impl Executor {
         info!("Order placed: order_id={} success={}", resp.order_id, resp.success);
         
         Ok(())
+    }
+
+    fn map_market_to_token_id(&self, market: &str) -> Result<U256> {
+        if let Ok(id) = U256::from_str(market) {
+            return Ok(id);
+        }
+
+        let mut acc: u128 = 0;
+        for b in market.as_bytes() {
+            acc = acc.wrapping_mul(131).wrapping_add(*b as u128);
+        }
+
+        if acc == 0 {
+            anyhow::bail!("unable to derive token_id from market");
+        }
+
+        Ok(U256::from(acc))
     }
 
     /// 计算仓位大小

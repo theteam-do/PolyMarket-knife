@@ -55,11 +55,6 @@ impl OrderSigner {
         Ok(format!("0x{}", hex::encode(signature.to_bytes())))
     }
 
-    /// 签名取消订单
-    pub fn sign_cancel(&self, order_id: &str) -> Result<String> {
-        self.sign_order(order_id)
-    }
-
     /// 生成订单哈希
     pub fn hash_order(
         &self,

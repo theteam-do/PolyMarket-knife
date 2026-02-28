@@ -1,7 +1,8 @@
 //! 监控指标 - Prometheus 格式
 
 use rust_decimal::Decimal;
-use std::sync::atomic::{AtomicU64, Ordering};
+use rust_decimal::prelude::ToPrimitive;
+use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// 监控指标收集器
@@ -10,7 +11,7 @@ pub struct MetricsCollector {
     orders_filled: AtomicU64,
     orders_cancelled: AtomicU64,
     orders_failed: AtomicU64,
-    daily_pnl: AtomicU64,
+    daily_pnl: AtomicI64,
     daily_volume: AtomicU64,
     last_update: AtomicU64,
 }
@@ -22,7 +23,7 @@ impl MetricsCollector {
             orders_filled: AtomicU64::new(0),
             orders_cancelled: AtomicU64::new(0),
             orders_failed: AtomicU64::new(0),
-            daily_pnl: AtomicU64::new(0),
+            daily_pnl: AtomicI64::new(0),
             daily_volume: AtomicU64::new(0),
             last_update: AtomicU64::new(current_timestamp()),
         }
@@ -30,7 +31,7 @@ impl MetricsCollector {
 
     pub fn record_order(&self, status: OrderStatus) {
         self.orders_placed.fetch_add(1, Ordering::Relaxed);
-        
+
         match status {
             OrderStatus::Filled => {
                 self.orders_filled.fetch_add(1, Ordering::Relaxed);
@@ -42,26 +43,34 @@ impl MetricsCollector {
                 self.orders_failed.fetch_add(1, Ordering::Relaxed);
             }
         }
-        
-        self.last_update.store(current_timestamp(), Ordering::Relaxed);
+
+        self.last_update
+            .store(current_timestamp(), Ordering::Relaxed);
     }
 
     pub fn record_pnl(&self, pnl: Decimal) {
-        let pnl_cents = (pnl * Decimal::from(100)).to_string().parse::<i64>().unwrap_or(0);
-        let current = self.daily_pnl.load(Ordering::Relaxed) as i64;
-        self.daily_pnl.store((current + pnl_cents) as u64, Ordering::Relaxed);
-        self.last_update.store(current_timestamp(), Ordering::Relaxed);
+        let pnl_cents = (pnl * Decimal::from(100))
+            .round()
+            .to_i64()
+            .unwrap_or(0);
+        self.daily_pnl.fetch_add(pnl_cents, Ordering::Relaxed);
+        self.last_update
+            .store(current_timestamp(), Ordering::Relaxed);
     }
 
     pub fn record_volume(&self, volume: Decimal) {
-        let volume_cents = (volume * Decimal::from(100)).to_string().parse::<u64>().unwrap_or(0);
+        let volume_cents = (volume * Decimal::from(100))
+            .round()
+            .to_u64()
+            .unwrap_or(0);
         self.daily_volume.fetch_add(volume_cents, Ordering::Relaxed);
-        self.last_update.store(current_timestamp(), Ordering::Relaxed);
+        self.last_update
+            .store(current_timestamp(), Ordering::Relaxed);
     }
 
     pub fn export_prometheus(&self) -> String {
         let timestamp = self.last_update.load(Ordering::Relaxed);
-        
+
         format!(
             r#"# HELP market_maker_orders_placed Total orders placed
 # TYPE market_maker_orders_placed counter
@@ -99,7 +108,7 @@ market_maker_last_update {} {}
             timestamp,
             self.orders_failed.load(Ordering::Relaxed),
             timestamp,
-            self.daily_pnl.load(Ordering::Relaxed) as i64,
+            self.daily_pnl.load(Ordering::Relaxed),
             timestamp,
             self.daily_volume.load(Ordering::Relaxed),
             timestamp,
@@ -111,7 +120,8 @@ market_maker_last_update {} {}
     pub fn reset_daily(&self) {
         self.daily_pnl.store(0, Ordering::Relaxed);
         self.daily_volume.store(0, Ordering::Relaxed);
-        self.last_update.store(current_timestamp(), Ordering::Relaxed);
+        self.last_update
+            .store(current_timestamp(), Ordering::Relaxed);
     }
 }
 
@@ -143,11 +153,11 @@ mod tests {
     #[test]
     fn test_record_order() {
         let collector = MetricsCollector::new();
-        
+
         collector.record_order(OrderStatus::Filled);
         collector.record_order(OrderStatus::Filled);
         collector.record_order(OrderStatus::Failed);
-        
+
         assert_eq!(collector.orders_placed.load(Ordering::Relaxed), 3);
         assert_eq!(collector.orders_filled.load(Ordering::Relaxed), 2);
         assert_eq!(collector.orders_failed.load(Ordering::Relaxed), 1);
@@ -156,10 +166,10 @@ mod tests {
     #[test]
     fn test_record_pnl() {
         let collector = MetricsCollector::new();
-        
+
         collector.record_pnl(dec!(100.50));
         collector.record_pnl(dec!(-50.25));
-        
+
         assert_eq!(collector.daily_pnl.load(Ordering::Relaxed) as i64, 5025);
     }
 
@@ -167,20 +177,22 @@ mod tests {
     fn test_export_prometheus() {
         let collector = MetricsCollector::new();
         collector.record_order(OrderStatus::Filled);
-        
+        collector.record_volume(dec!(12.34));
+
         let output = collector.export_prometheus();
-        
+
         assert!(output.contains("market_maker_orders_placed 1"));
         assert!(output.contains("market_maker_orders_filled 1"));
+        assert!(output.contains("market_maker_daily_volume 1234"));
     }
 
     #[test]
     fn test_reset_daily() {
         let collector = MetricsCollector::new();
-        
+
         collector.record_pnl(dec!(100.0));
         collector.reset_daily();
-        
+
         assert_eq!(collector.daily_pnl.load(Ordering::Relaxed), 0);
     }
 }

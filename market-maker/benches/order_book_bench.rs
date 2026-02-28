@@ -1,6 +1,6 @@
 //! 订单簿性能基准测试
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rust_decimal::Decimal;
 
 fn bench_orderbook_creation(c: &mut Criterion) {
