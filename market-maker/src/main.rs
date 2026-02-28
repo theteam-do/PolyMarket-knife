@@ -1,12 +1,16 @@
-//! Market Maker - 简化版本
+//! Market Maker - 简化工作版本
 
 use anyhow::{Context, Result};
 use tracing::info;
 
 mod config;
 mod executor;
+mod order_book;
+mod quoting;
+mod risk;
 
 use config::Config;
+use executor::Executor;
 
 fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -15,6 +19,8 @@ fn main() -> Result<()> {
                 .add_directive("market_maker=info".parse()?)
         )
         .init();
+
+    info!("Market Maker starting up...");
 
     let config_path = std::env::args()
         .nth(1)
@@ -25,8 +31,7 @@ fn main() -> Result<()> {
 
     let _executor = Executor::new(&config);
     
-    info!("Market Maker started");
+    info!("Market Maker initialized");
 
     Ok(())
 }
-use executor::Executor;
