@@ -3,7 +3,6 @@ name = "market-maker"
 version.workspace = true
 edition.workspace = true
 description = "Polymarket 返佣做市策略 - 极致低延迟"
-
 [dependencies]
 tokio.workspace = true
 serde.workspace = true
@@ -16,5 +15,4 @@ anyhow.workspace = true
 parking_lot.workspace = true
 rust_decimal.workspace = true
 config.workspace = true
-ethers.workspace = true
-poly-client = { path = "../poly-client" }
+poly-adapter = { path = "../poly-adapter" }

@@ -8,7 +8,8 @@ members = [
     "volatility-hunter",
     "info-edge",
     "order-attack",
-    "poly-client",
+    "poly-adapter",
+    # "poly-client",  # 已弃用，迁移到官方 SDK
 ]
 
 [workspace.package]
@@ -18,51 +19,49 @@ authors = ["PolyMarket Knife Team"]
 license = "MIT"
 
 [workspace.dependencies]
-# 异步运行时
-tokio = { version = "1.43", features = ["full"] }
-tokio-util = "0.7"
+# ===== 官方 Polymarket SDK =====
+polymarket-client-sdk = { version = "0.4", features = ["clob", "data", "gamma", "ws", "ctf", "tracing"] }
 
-# 序列化
+# ===== 异步运行时 =====
+tokio = { version = "1.43", features = ["full", "rt-multi-thread", "sync", "time", "macros", "net"] }
+tokio-util = "0.7"
+async-trait = "0.1"
+futures-util = "0.3"
+
+# ===== 序列化 =====
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 toml = "0.8"
 
-# HTTP/WebSocket
-reqwest = { version = "0.12", features = ["json", "stream"] }
-tungstenite = "0.26"
-tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
-
-# 日志
+# ===== 日志 =====
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
-# 错误处理
+# ===== 错误处理 =====
 thiserror = "2.0"
 anyhow = "1.0"
 
-# 并发
+# ===== 并发 =====
 parking_lot = "0.12"
 crossbeam = "0.8"
 
-# 加密/区块链
-ethers = { version = "2.0", features = ["ws", "abigen"] }
-hex = "0.4"
-sha3 = "0.10"
-k256 = "0.13"
-
-# 工具
+# ===== 工具 =====
 rust_decimal = "1.36"
 rust_decimal_macros = "1.36"
 chrono = "0.4"
 regex = "1.11"
 ordered-float = "4.6"
 bytes = "1.10"
+uuid = { version = "1.21", features = ["serde", "v4"] }
 
-# 配置
+# ===== 配置 =====
 config = "0.15"
 
-# Futures
-futures-util = "0.3"
+# ===== 加密/区块链 (官方 SDK 已包含 alloy) =====
+# 保留 hex 用于简单转换
+hex = "0.4"
+sha3 = "0.10"
+k256 = "0.13"
 
 [profile.release]
 opt-level = 3
