@@ -15,5 +15,5 @@ anyhow.workspace = true
 rust_decimal.workspace = true
 rust_decimal_macros.workspace = true
 polymarket-client-sdk.workspace = true
-prometheus = "0.13"
+prometheus = "0.14"
 chrono.workspace = true
