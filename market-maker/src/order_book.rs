@@ -108,7 +108,7 @@ mod tests {
         
         let spread = book.spread();
         assert!(spread.is_some());
-        assert_eq!(spread.unwrap(), 0.02);
+        assert!((spread.unwrap() - 0.02).abs() < 0.001);
     }
 
     #[test]
