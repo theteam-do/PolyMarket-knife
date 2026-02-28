@@ -4,7 +4,6 @@ use anyhow::{Context, Result};
 use rust_decimal::Decimal;
 use tracing::{warn, instrument};
 
-use poly_client::PolyClient;
 use crate::config::Config;
 
 pub struct Scanner {

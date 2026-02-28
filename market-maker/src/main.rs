@@ -26,20 +26,22 @@ pub struct MarketMaker {
     order_book: Arc<Mutex<OrderBook>>,
     quoter: Quoter,
     risk_manager: Arc<Mutex<RiskManager>>,
-    executor: Executor,
+    executor: Option<Executor>,
     running: bool,
 }
 
 impl MarketMaker {
-    pub fn new(config: Config) -> Self {
-        Self {
+    pub async fn new(config: Config) -> Result<Self> {
+        let executor = Executor::new(&config).await.ok();
+        
+        Ok(Self {
             order_book: Arc::new(Mutex::new(OrderBook::new())),
             quoter: Quoter::new(&config.strategy),
             risk_manager: Arc::new(Mutex::new(RiskManager::new(&config.risk))),
-            executor: Executor::new(&config),
+            executor,
             config,
             running: false,
-        }
+        })
     }
 
     #[instrument(skip(self), fields(name = "market_maker"))]
@@ -49,7 +51,7 @@ impl MarketMaker {
 
         // 启动订单簿更新循环
         let ob_clone = Arc::clone(&self.order_book);
-        let executor_clone = self.executor.clone();
+        let executor_clone = self.executor.as_ref().unwrap().clone();
         let market_ids = self.config.strategy.market_ids.clone();
         
         tokio::spawn(async move {
@@ -180,10 +182,10 @@ impl MarketMaker {
         // 风控检查后下新单
         if risk.can_place_order(market_id, bid, ask) {
             // 取消旧订单
-            self.executor.cancel_orders(market_id).await?;
+            self.executor.as_ref().unwrap().cancel_orders(market_id).await?;
             
             // 下新订单
-            self.executor.place_orders(market_id, bid, ask).await?;
+            self.executor.as_ref().unwrap().place_orders(market_id, bid, ask).await?;
             
             info!("Requoted: bid={}, ask={}", bid, ask);
         }
@@ -216,7 +218,7 @@ async fn main() -> Result<()> {
         .context("Failed to load config")?;
 
     // 创建并运行做市商
-    let mut mm = MarketMaker::new(config);
+    let mut mm = MarketMaker::new(config).await?;
     
     // 处理信号
     tokio::spawn(async move {

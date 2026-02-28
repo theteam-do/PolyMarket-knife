@@ -1,5 +1,4 @@
 use anyhow::Result;
-use poly_client::AuthConfig;
 use serde::Deserialize;
 use std::path::Path;
 

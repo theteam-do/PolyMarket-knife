@@ -1,6 +1,4 @@
 use anyhow::Result;
-use ethers::signers::LocalWallet;
-use poly_client::AuthConfig;
 use serde::Deserialize;
 use std::path::Path;
 
@@ -51,42 +49,5 @@ impl Config {
         let content = std::fs::read_to_string(path)?;
         let config: Config = toml::from_str(&content)?;
         Ok(config)
-    }
-
-    pub fn from_env() -> Result<Self> {
-        Ok(Self {
-            polygon: PolygonConfig {
-                rpc_url: std::env::var("POLYGON_RPC_URL")
-                    .unwrap_or_else(|_| "https://polygon-rpc.com".to_string()),
-                private_key: std::env::var("PRIVATE_KEY").unwrap_or_default(),
-            },
-            clob: ClobConfig {
-                host: std::env::var("CLOB_HOST")
-                    .unwrap_or_else(|_| "https://clob.polymarket.com".to_string()),
-                api_key: std::env::var("CLOB_API_KEY").ok(),
-                api_secret: std::env::var("CLOB_API_SECRET").ok(),
-            },
-            strategy: StrategyConfig {
-                market_ids: vec![],
-                spread_bps: 100,
-                order_size_usd: 1000.0,
-                refresh_interval_ms: 100,
-                skew_inventory: true,
-                min_spread_bps: 50,
-                max_spread_bps: 500,
-            },
-            risk: RiskConfig {
-                max_position_usd: 10000.0,
-                max_loss_per_day: 500.0,
-                stop_loss_pct: 5.0,
-                max_orders: 10,
-                max_order_size_usd: 5000.0,
-            },
-        })
-    }
-
-    pub fn to_auth_config(&self) -> AuthConfig {
-        AuthConfig::from_private_key(&self.polygon.private_key, &self.clob.host)
-            .expect("Failed to derive API credentials")
     }
 }

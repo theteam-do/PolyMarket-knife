@@ -4,7 +4,6 @@ use anyhow::{Context, Result};
 use rust_decimal::Decimal;
 use tracing::{info, instrument};
 
-use poly_client::{PolyClient, Side as PolySide};
 use crate::config::Config;
 use crate::monitor::{TradeEvent, Side};
 
