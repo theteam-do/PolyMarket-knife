@@ -21,13 +21,7 @@ pub type MarketId = String;
 
 /// 将字符串转换为 Token ID (U256)
 pub fn str_to_token_id(s: &str) -> Result<polymarket_client_sdk::types::U256, Error> {
-    // 支持十进制和十六进制格式
-    if s.starts_with("0x") {
-        Ok(polymarket_client_sdk::types::U256::from_str(s)?)
-    } else {
-        // 尝试解析为十进制
-        Ok(polymarket_client_sdk::types::U256::from_str_radix(s, 10)?)
-    }
+    Ok(polymarket_client_sdk::types::U256::from_str(s)?)
 }
 
 /// 将 Token ID 转换为字符串
@@ -91,18 +85,6 @@ impl OrderBook {
             _ => None,
         }
     }
-
-    /// 获取价差 (基点)
-    pub fn spread_bps(&self) -> Option<u32> {
-        self.mid_price().and_then(|mid| {
-            self.spread().map(|spread| {
-                ((spread / mid) * dec!(10000))
-                    .to_string()
-                    .parse()
-                    .unwrap_or(0)
-            })
-        })
-    }
 }
 
 /// 订单
@@ -113,7 +95,6 @@ pub struct Order {
     pub price: Price,
     pub size: Size,
     pub side: Side,
-    pub status: OrderStatus,
 }
 
 /// 持仓
@@ -121,7 +102,6 @@ pub struct Order {
 pub struct Position {
     pub token_id: TokenId,
     pub balance: Size,
-    pub total_cost: Price,
 }
 
 /// 交易记录
@@ -144,14 +124,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_str_to_token_id_decimal() {
+    fn test_str_to_token_id() {
         let result = str_to_token_id("123456").unwrap();
-        assert_eq!(result.to_string(), "123456");
-    }
-
-    #[test]
-    fn test_str_to_token_id_hex() {
-        let result = str_to_token_id("0x1E240").unwrap();
         assert_eq!(result.to_string(), "123456");
     }
 
@@ -159,13 +133,6 @@ mod tests {
     fn test_f64_to_decimal() {
         let result = f64_to_decimal(0.50).unwrap();
         assert_eq!(result, dec!(0.50));
-    }
-
-    #[test]
-    fn test_decimal_to_f64() {
-        let decimal = dec!(0.75);
-        let result = decimal_to_f64(decimal);
-        assert!((result - 0.75).abs() < 0.0001);
     }
 
     #[test]

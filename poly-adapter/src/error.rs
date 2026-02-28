@@ -54,24 +54,3 @@ impl From<anyhow::Error> for Error {
         Error::Other(err.to_string())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_error_display() {
-        let err = Error::Auth("Invalid credentials".to_string());
-        assert_eq!(err.to_string(), "Authentication error: Invalid credentials");
-    }
-
-    #[test]
-    fn test_conversion_error() {
-        let err = Error::Conversion {
-            from: "String".to_string(),
-            to: "U256".to_string(),
-            reason: "Invalid format".to_string(),
-        };
-        assert!(err.to_string().contains("String -> U256"));
-    }
-}

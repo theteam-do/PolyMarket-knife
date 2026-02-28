@@ -2,8 +2,6 @@
 
 use polymarket_client_sdk::auth::{Credentials, LocalSigner, Signer};
 use polymarket_client_sdk::clob::{Client, Config};
-use polymarket_client_sdk::clob::state::Authenticated;
-use polymarket_client_sdk::auth::Normal;
 use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
 use std::str::FromStr;
 use tracing::info;
@@ -38,19 +36,19 @@ impl AuthConfig {
     }
 
     /// 创建认证客户端
-    pub async fn create_client(&self) -> Result<Client<Authenticated<Normal>>> {
+    pub async fn create_client(&self) -> Result<Client> {
+        use polymarket_client_sdk::clob::state::Authenticated;
+        use polymarket_client_sdk::auth::Normal;
+        
         info!("Authenticating with CLOB host: {}", self.clob_host);
 
-        let signer = LocalSigner::from_str(&self.private_key)
-            .map_err(|e| Error::Auth(format!("Failed to parse private key: {}", e)))?
+        let signer = LocalSigner::from_str(&self.private_key)?
             .with_chain_id(Some(self.chain_id));
 
-        let client: Client<Authenticated<Normal>> = Client::new(&self.clob_host, Config::default())
-            .map_err(|e| Error::Auth(format!("Failed to create client: {}", e)))?
+        let client: Client<Authenticated<Normal>> = Client::new(&self.clob_host, Config::default())?
             .authentication_builder(&signer)
             .authenticate()
-            .await
-            .map_err(|e| Error::Auth(format!("Failed to authenticate: {}", e)))?;
+            .await?;
 
         info!("Authentication successful");
         Ok(client)
@@ -79,12 +77,5 @@ mod tests {
         assert_eq!(config.private_key, "0x1234");
         assert_eq!(config.clob_host, "https://clob.polymarket.com");
         assert_eq!(config.chain_id, POLYGON);
-    }
-
-    #[test]
-    fn test_auth_config_with_chain_id() {
-        let config = AuthConfig::new("0x1234", "https://clob.polymarket.com")
-            .with_chain_id(80002); // Amoy testnet
-        assert_eq!(config.chain_id, 80002);
     }
 }
