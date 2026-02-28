@@ -1,0 +1,152 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  # 测试
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          components: rustfmt, clippy
+      
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+      
+      - name: Run Tests
+        run: cargo test --all --all-targets
+      
+      - name: Upload Coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: cobertura.xml
+          fail_ci_if_error: false
+
+  # Clippy 检查
+  clippy:
+    name: Clippy Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          components: clippy
+      
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+      
+      - name: Run Clippy
+        run: cargo clippy --all --all-targets -- -D warnings
+
+  # 格式化检查
+  fmt:
+    name: Rustfmt Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          components: rustfmt
+      
+      - name: Check Formatting
+        run: cargo fmt --all -- --check
+
+  # 构建检查
+  build:
+    name: Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+      
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+      
+      - name: Build Debug
+        run: cargo build --all
+      
+      - name: Build Release
+        run: cargo build --all --release
+
+  # 文档检查
+  docs:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+      
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+      
+      - name: Check Documentation
+        run: cargo doc --all --no-deps --document-private-items
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+
+  # 安全审计
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+      
+      - name: Install Cargo Audit
+        run: cargo install cargo-audit
+      
+      - name: Run Audit
+        run: cargo audit || true  # 不阻塞 CI
+
+  # 发布
+  release:
+    name: Release
+    needs: [test, clippy, fmt, build]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+      
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+      
+      - name: Build Release
+        run: cargo build --all --release
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            target/release/market-maker
+            target/release/arbitrage
+            target/release/follow-trade
+            target/release/volatility-hunter
+            target/release/info-edge
+            target/release/order-attack
+          generate_release_notes: true

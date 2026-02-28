@@ -34,3 +34,12 @@ path = "../tests/integration_test.rs"
 name = "e2e_test"
 path = "../tests/e2e_test.rs"
 async-trait = { workspace = true }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+mockall = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }
+
+[[bench]]
+name = "order_book_bench"
+harness = false

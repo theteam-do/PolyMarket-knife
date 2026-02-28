@@ -21,3 +21,5 @@ rust_decimal.workspace = true
 parking_lot.workspace = true
 futures-util = "0.3"
 sha3 = "0.10"
+tokio-tungstenite.workspace = true
+futures-util.workspace = true
