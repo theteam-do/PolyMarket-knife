@@ -19,6 +19,10 @@ rust_decimal_macros.workspace = true
 chrono.workspace = true
 config.workspace = true
 polymarket-client-sdk.workspace = true
+alloy.workspace = true
+hex.workspace = true
+sha3.workspace = true
+k256.workspace = true
 
 [dev-dependencies]
 mockall.workspace = true

@@ -2766,10 +2766,13 @@ dependencies = [
 name = "market-maker"
 version = "0.1.0"
 dependencies = [
+ "alloy",
  "anyhow",
  "chrono",
  "config",
  "criterion",
+ "hex",
+ "k256",
  "mockall",
  "polymarket-client-sdk",
  "reqwest 0.12.28",
@@ -2777,6 +2780,7 @@ dependencies = [
  "rust_decimal_macros",
  "serde",
  "serde_json",
+ "sha3",
  "thiserror 2.0.18",
  "tokio",
  "toml 0.8.23",
