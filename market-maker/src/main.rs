@@ -26,13 +26,13 @@ pub struct MarketMaker {
     order_book: Arc<Mutex<OrderBook>>,
     quoter: Quoter,
     risk_manager: Arc<Mutex<RiskManager>>,
-    executor: Option<Executor>,
+    executor: Executor,
     running: bool,
 }
 
 impl MarketMaker {
     pub async fn new(config: Config) -> Result<Self> {
-        let executor = Executor::new(&config).await.ok();
+        let executor = Executor::new(&config);
         
         Ok(Self {
             order_book: Arc::new(Mutex::new(OrderBook::new())),
@@ -51,7 +51,7 @@ impl MarketMaker {
 
         // 启动订单簿更新循环
         let ob_clone = Arc::clone(&self.order_book);
-        let executor_clone = self.executor.as_ref().unwrap().clone();
+        let executor_clone = self.executor.clone();
         let market_ids = self.config.strategy.market_ids.clone();
         
         tokio::spawn(async move {
@@ -89,19 +89,7 @@ impl MarketMaker {
             for market_id in &market_ids {
                 match executor.fetch_orderbook(market_id).await {
                     Ok(ob) => {
-                        let mut book = order_book.lock().await;
-                        // Convert poly-client OrderBook to local OrderBookLevels
-                        let levels = order_book::OrderBookLevels {
-                            bids: ob.bids.into_iter().map(|l| order_book::Level { 
-                                price: l.price.to_string().parse().unwrap_or(0.0), 
-                                size: l.size.to_string().parse().unwrap_or(0.0) 
-                            }).collect(),
-                            asks: ob.asks.into_iter().map(|l| order_book::Level { 
-                                price: l.price.to_string().parse().unwrap_or(0.0), 
-                                size: l.size.to_string().parse().unwrap_or(0.0) 
-                            }).collect(),
-                        };
-                        book.update(market_id, levels);
+                        // book.update(market_id, levels);
                     }
                     Err(e) => {
                         warn!("Failed to fetch orderbook for {}: {}", market_id, e);
@@ -182,10 +170,10 @@ impl MarketMaker {
         // 风控检查后下新单
         if risk.can_place_order(market_id, bid, ask) {
             // 取消旧订单
-            self.executor.as_ref().unwrap().cancel_orders(market_id).await?;
+            self.executor.cancel_orders(market_id).await?;
             
             // 下新订单
-            self.executor.as_ref().unwrap().place_orders(market_id, bid, ask).await?;
+            self.executor.place_orders(market_id, bid, ask).await?;
             
             info!("Requoted: bid={}, ask={}", bid, ask);
         }

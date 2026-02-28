@@ -38,8 +38,6 @@ impl Config {
         Ok(config)
     }
 
-    pub fn to_auth_config(&self) -> AuthConfig {
-        AuthConfig::from_private_key(&self.polygon.private_key, &self.clob.host)
             .expect("Failed to derive API credentials")
     }
 }
