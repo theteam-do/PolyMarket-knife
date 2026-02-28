@@ -1,0 +1,13 @@
+# Arbitrage 配置文件
+
+[polygon]
+rpc_url = "wss://polygon-rpc.com"
+private_key = "YOUR_PRIVATE_KEY_HERE"
+
+[strategy]
+min_profit_usd = 0.02           # 最小利润 (扣除 Gas 后)
+max_position_per_trade = 1000   # 单笔最大仓位
+scan_interval_ms = 50           # 扫描间隔
+gas_price_gwei = 50             # Gas 价格
+include_all = true              # 包含所有市场
+exclude = []                    # 排除的市场

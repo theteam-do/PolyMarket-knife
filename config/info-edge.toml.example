@@ -1,0 +1,36 @@
+# Info Edge 配置文件
+# ⚠️ 请确保遵守当地法律法规
+
+[polygon]
+rpc_url = "wss://polygon-rpc.com"
+private_key = "YOUR_PRIVATE_KEY_HERE"
+
+[sources]
+# 新闻源 API
+news_apis = [
+    { name = "twitter", url = "https://api.twitter.com/2/tweets/search/recent", token = "YOUR_TOKEN" },
+    { name = "reuters", url = "https://api.reuters.com/news", token = "YOUR_TOKEN" },
+]
+
+# 监控关键词
+keywords = [
+    "election",
+    "fed rate",
+    "gdp",
+    "unemployment",
+]
+
+# 政府网站监控
+gov_websites = [
+    "https://www.whitehouse.gov/briefing-room/",
+    "https://www.federalreserve.gov/newsevents.htm",
+]
+
+[strategy]
+confidence_threshold = 0.8      # 置信度阈值
+max_position_usd = 50000
+min_expected_return = 0.3       # 最小预期收益 30%
+
+[risk]
+max_daily_loss = 5000
+legal_review_required = true    # ⚠️ 建议开启

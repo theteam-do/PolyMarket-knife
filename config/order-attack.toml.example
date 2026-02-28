@@ -1,0 +1,27 @@
+# Order Attack 配置文件
+# ⚠️⚠️⚠️ 仅供测试网学习使用 ⚠️⚠️⚠️
+
+[polygon]
+# ⚠️ 必须使用测试网
+rpc_url = "wss://mumbai-rpc.com"
+private_key = "YOUR_TESTNET_PRIVATE_KEY"
+
+[strategy]
+# 攻击参数
+attack_gas_limit = 50000            # 故意设置低的 Gas
+attack_nonce_gap = true             # 制造 nonce 间隙
+target_spread_bps = 5000            # 垄断后价差 50%
+
+# 目标选择
+min_liquidity_usd = 10000           # 最小流动性目标
+exclude_addresses = []              # 排除地址
+
+# 风险控制 (自保)
+max_attacks_per_day = 10
+cooldown_seconds = 300              # 攻击间隔 5 分钟
+
+[warning]
+# ⚠️ 必须设置为 true 才能运行
+testnet_only = true
+# ⚠️ 设置为 true 表示你理解并接受风险
+acknowledged = false

@@ -1,0 +1,23 @@
+[package]
+name = "poly-client"
+version.workspace = true
+edition.workspace = true
+description = "Polymarket CLOB API 客户端"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+reqwest.workspace = true
+tokio-tungstenite.workspace = true
+tracing.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
+hex.workspace = true
+k256.workspace = true
+ethers.workspace = true
+rust_decimal.workspace = true
+parking_lot.workspace = true
+futures-util = "0.3"
+sha3 = "0.10"

@@ -1,0 +1,33 @@
+# 编译产物
+/target/
+**/target/
+
+# 配置文件 (包含私钥)
+config/*.toml
+!config/*.toml.example
+
+# 环境变量
+.env
+.env.local
+
+# 日志文件
+*.log
+logs/
+
+# 备份文件
+*.bak
+*.backup
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# 测试产物
+*.pem
+*.key

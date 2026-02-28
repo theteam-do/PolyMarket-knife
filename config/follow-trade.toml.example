@@ -1,0 +1,23 @@
+# Follow Trade 配置文件
+
+[polygon]
+rpc_url = "wss://polygon-rpc.com"
+private_key = "YOUR_PRIVATE_KEY_HERE"
+
+[strategy]
+# 监控的聪明钱地址 (示例)
+smart_addresses = [
+    "0x0000000000000000000000000000000000000001",
+    "0x0000000000000000000000000000000000000002",
+]
+
+# 跟单参数
+min_trade_size_usd = 1000     # 最小跟单金额
+max_trade_size_usd = 5000     # 最大跟单金额
+copy_ratio = 0.1              # 跟单比例 (10%)
+slippage_tolerance = 0.02     # 滑点容忍度 (2%)
+
+# 风控
+max_position_per_market = 10000
+max_daily_loss = 1000
+blacklist = []                # 黑名单市场
