@@ -3,61 +3,68 @@
 use anyhow::{Context, Result};
 use alloy::signers::local::LocalSigner;
 use alloy::signers::Signer;
-use polymarket_client_sdk::clob::{Client, Config};
-use polymarket_client_sdk::clob::types::{Side as SdkSide, Amount};
+use polymarket_client_sdk::clob::types::request::OrdersRequest;
+use polymarket_client_sdk::clob::types::{Amount, OrderType, Side as SdkSide};
+use polymarket_client_sdk::clob::{Client, Config as SdkConfig};
 use polymarket_client_sdk::types::{Decimal, U256};
 use polymarket_client_sdk::{POLYGON, PRIVATE_KEY_VAR};
 use rust_decimal_macros::dec;
 use std::str::FromStr;
+use std::sync::Arc;
 use tracing::{info, instrument};
 
-use crate::config::Config as AppConfig;
-use crate::signal::Signal;
+use crate::config::Config;
 use crate::nlp::Direction;
+use crate::signal::Signal;
 
+/// 交易执行器
 pub struct Executor {
-    client: Client,
-    config: AppConfig,
+    client: Arc<Client>,
+    signer: LocalSigner,
+    config: Config,
 }
 
 impl Executor {
-    pub async fn new(config: &AppConfig) -> Result<Self> {
+    /// 创建新的执行器
+    pub async fn new(config: &Config) -> Result<Self> {
         let private_key = std::env::var(PRIVATE_KEY_VAR)
             .context("Need POLYMARKET_PRIVATE_KEY environment variable")?;
         
         let signer = LocalSigner::from_str(&private_key)?
             .with_chain_id(Some(POLYGON));
 
-        let client = Client::new(&config.clob.host, Config::default())?
+        let sdk_config = SdkConfig::builder()
+            .use_server_time(true)
+            .build();
+
+        let client = Client::new(&config.clob.host, sdk_config)?
             .authentication_builder(&signer)
             .authenticate()
             .await
             .context("Failed to authenticate")?;
 
         Ok(Self {
-            client,
+            client: Arc::new(client),
+            signer,
             config: config.clone(),
         })
     }
 
+    /// 执行交易信号
     #[instrument(skip(self), fields(signal = ?signal))]
     pub async fn execute(&self, signal: &Signal) -> Result<()> {
         let position = self.calculate_position(signal.confidence);
         
         info!(
-            "Executing order: {} {} @ confidence {:.2}, position ${}",
-            match signal.direction {
-                Direction::Yes => "BUY",
-                Direction::No => "SELL",
-                Direction::Neutral => "HOLD",
-            },
+            "Executing order: direction={:?} market={} confidence={:.2} position=${}",
+            signal.direction,
             signal.market,
             signal.confidence,
             position
         );
 
-        // TODO: 将市场映射到 token_id
-        // 目前只是示例，需要实际的市场 ID
+        // TODO: 将市场映射到实际的 token_id
+        // 这里使用示例 token_id
         let token_id = U256::from_str("123456789")?;
         
         let side = match signal.direction {
@@ -66,32 +73,62 @@ impl Executor {
             Direction::Neutral => return Ok(()),
         };
 
-        // 使用官方 SDK 下单
+        // 创建限价单
         let order = self.client
             .limit_order()
             .token_id(token_id)
-            .price(dec!(0.50))  // 示例价格
-            .amount(Amount::usdc(position)?)
+            .order_type(OrderType::GTC)
+            .price(dec!(0.50))  // 示例价格，实际需要获取市场价格
+            .size(position)
             .side(side)
             .build()
             .await?;
 
-        // 需要 signer 来签名订单
-        // 这里简化处理，实际需要获取 signer
-        info!("Order built: {:?}", order);
+        // 签名订单
+        let signed_order = self.client.sign(&self.signer, order).await?;
+        
+        // 提交订单
+        let resp = self.client.post_order(signed_order).await?;
+        
+        info!("Order placed: order_id={} success={}", resp.order_id, resp.success);
         
         Ok(())
     }
 
+    /// 计算仓位大小
     fn calculate_position(&self, confidence: f64) -> Decimal {
-        let base = self.config.strategy.max_position_usd;
-        let base_dec = Decimal::from_f64_retain(base).unwrap_or(dec!(1000));
+        let base = Decimal::from_f64_retain(self.config.strategy.max_position_usd)
+            .unwrap_or(dec!(1000));
         
         // 高置信度用大仓位，低置信度用小仓位
         if confidence >= self.config.strategy.confidence_threshold {
-            base_dec
+            base
         } else {
-            base_dec * dec!(0.3)
+            base * dec!(0.3)
         }
+    }
+
+    /// 获取当前订单
+    pub async fn get_orders(&self) -> Result<Vec<String>> {
+        let request = OrdersRequest::default();
+        let page = self.client.orders(&request, None).await?;
+        
+        Ok(page.data.iter().map(|o| o.order_id.to_string()).collect())
+    }
+
+    /// 取消订单
+    pub async fn cancel_order(&self, order_id: &str) -> Result<()> {
+        use uuid::Uuid;
+        let order_uuid = Uuid::parse_str(order_id)?;
+        self.client.cancel_order(order_uuid).await?;
+        info!("Order cancelled: {}", order_id);
+        Ok(())
+    }
+
+    /// 取消所有订单
+    pub async fn cancel_all(&self) -> Result<()> {
+        self.client.cancel_all(None).await?;
+        info!("All orders cancelled");
+        Ok(())
     }
 }
