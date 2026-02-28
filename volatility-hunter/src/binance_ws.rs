@@ -1,6 +1,7 @@
 //! 币安 WebSocket 数据源
 
 use anyhow::{Context, Result};
+use futures_util::StreamExt;
 use serde::Deserialize;
 use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
@@ -10,13 +11,13 @@ use crate::config::BinanceConfig;
 use crate::PriceTick;
 
 pub struct BinanceFeed {
-    _config: BinanceConfig,
+    config: BinanceConfig,
 }
 
 impl BinanceFeed {
     pub fn new(config: &BinanceConfig) -> Self {
         Self {
-            _config: config.clone(),
+            config: config.clone(),
         }
     }
 
@@ -31,9 +32,9 @@ impl BinanceFeed {
             .collect();
         
         let stream_path = streams.join("/");
-        let url = format!("{}/{}", self._config.ws_url, stream_path);
+        let url = format!("{}/{}", self.config.ws_url, stream_path);
 
-        info!("🔌 Connecting to Binance WebSocket: {}", url);
+        info!("Connecting to Binance WebSocket: {}", url);
 
         loop {
             match self.connect_and_stream(&url, &tx).await {
@@ -53,10 +54,9 @@ impl BinanceFeed {
             .await
             .context("Failed to connect to Binance WebSocket")?;
 
-        info!("✅ Connected to Binance WebSocket");
+        info!("Connected to Binance WebSocket");
 
-        use futures_util::StreamExt;
-        let (_write, mut read) = ws_stream.split();
+        let (_, mut read) = ws_stream.split();
 
         while let Some(msg_result) = read.next().await {
             match msg_result {

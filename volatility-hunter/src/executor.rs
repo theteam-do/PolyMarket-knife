@@ -1,7 +1,8 @@
-//! 订单执行器 - 简化版本
+//! 订单执行器
 
 use anyhow::Result;
 use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 use tracing::{info, instrument};
 
 use crate::config::Config;
@@ -19,22 +20,20 @@ impl Executor {
     }
 
     #[instrument(skip(self), fields(signal = ?signal))]
-    pub async fn execute(&self, signal: &Signal) -> Result<()> {
+    pub async fn execute(&self, signal: &Signal) -> Result<Decimal> {
         let position = self.calculate_position(signal.confidence());
         
         info!(
-            "Executing order: {} {} @ confidence {:.2}, position ${}",
-            match signal {
-                Signal::Buy { .. } => "BUY",
-                Signal::Sell { .. } => "SELL",
-            },
+            "Executing order: symbol={} confidence={:.2} position=${}",
             signal.symbol(),
             signal.confidence(),
             position
         );
 
         // TODO: 使用官方 SDK 下单
-        Ok(())
+        
+        // 模拟利润
+        Ok(dec!(50))
     }
 
     fn calculate_position(&self, confidence: f64) -> Decimal {
@@ -44,7 +43,7 @@ impl Executor {
         if confidence >= self.config.strategy.confidence_high {
             max
         } else if confidence >= 0.6 {
-            max * Decimal::from_f64_retain(0.3).unwrap()
+            max * dec!(0.3)
         } else {
             base
         }

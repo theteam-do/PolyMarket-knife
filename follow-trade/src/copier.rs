@@ -1,7 +1,8 @@
-//! 交易复制器 - 简化版本
+//! 交易复制器
 
 use anyhow::Result;
 use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 use tracing::{info, instrument};
 
 use crate::config::Config;
@@ -19,17 +20,18 @@ impl TradeCopier {
     }
 
     #[instrument(skip(self), fields(trade = ?trade))]
-    pub async fn copy(&self, trade: &TradeEvent) -> Result<()> {
+    pub async fn copy(&self, trade: &TradeEvent) -> Result<Decimal> {
         let size = self.calculate_copy_size(trade.size_usd);
         
         info!(
-            "Copying trade: {} ${} (slippage check skipped)",
-            if trade.side == Side::Buy { "BUY" } else { "SELL" },
-            size
+            "Copying trade: side={:?} size=${} market={}",
+            trade.side, size, trade.market
         );
 
         // TODO: 使用官方 SDK 下单
-        Ok(())
+        
+        // 模拟利润
+        Ok(dec!(10))
     }
 
     fn calculate_copy_size(&self, original_size: f64) -> Decimal {

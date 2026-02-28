@@ -2,7 +2,8 @@
 name = "volatility-hunter"
 version.workspace = true
 edition.workspace = true
-description = "超短期波动狩猎 - 毫秒级延迟捕捉定价延迟"
+description = "超短期波动狩猎策略"
+
 [dependencies]
 tokio.workspace = true
 serde.workspace = true
@@ -12,13 +13,9 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
-parking_lot.workspace = true
-crossbeam.workspace = true
 rust_decimal.workspace = true
-reqwest.workspace = true
 rust_decimal_macros.workspace = true
-ordered-float.workspace = true
-bytes.workspace = true
+polymarket-client-sdk.workspace = true
 config.workspace = true
+tokio-tungstenite.workspace = true
 futures-util.workspace = true
-tokio-tungstenite = "0.28"

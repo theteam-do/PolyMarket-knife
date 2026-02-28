@@ -1,13 +1,14 @@
 //! 风控管理器
 
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
+
 use crate::config::StrategyConfig;
 use crate::signal::Signal;
-use std::collections::HashMap;
 
 pub struct RiskManager {
     config: StrategyConfig,
-    daily_pnl: f64,
-    positions: HashMap<String, f64>,
+    daily_pnl: Decimal,
     consecutive_losses: u32,
 }
 
@@ -15,19 +16,19 @@ impl RiskManager {
     pub fn new(config: &StrategyConfig) -> Self {
         Self {
             config: config.clone(),
-            daily_pnl: 0.0,
-            positions: HashMap::new(),
+            daily_pnl: dec!(0),
             consecutive_losses: 0,
         }
     }
 
     pub fn can_trade(&self, signal: &Signal) -> bool {
         // 检查日亏损
-        if self.daily_pnl < -self.config.max_daily_loss {
+        let max_loss = Decimal::from_f64_retain(self.config.max_daily_loss).unwrap();
+        if self.daily_pnl < -max_loss {
             return false;
         }
 
-        // 检查连续亏损 (防止上头)
+        // 检查连续亏损
         if self.consecutive_losses >= 5 {
             return false;
         }
@@ -41,27 +42,18 @@ impl RiskManager {
         signal.confidence() >= 0.5
     }
 
-    pub fn update_pnl(&mut self, pnl: f64) {
+    pub fn update_pnl(&mut self, pnl: Decimal) {
         self.daily_pnl += pnl;
-
-        if pnl < 0.0 {
+        
+        if pnl < dec!(0) {
             self.consecutive_losses += 1;
         } else {
             self.consecutive_losses = 0;
         }
     }
 
-    pub fn update_position(&mut self, market: &str, delta: f64) {
-        let pos = self.positions.entry(market.to_string()).or_insert(0.0);
-        *pos += delta;
-    }
-
-    pub fn daily_pnl(&self) -> f64 {
-        self.daily_pnl
-    }
-
     pub fn reset_daily(&mut self) {
-        self.daily_pnl = 0.0;
+        self.daily_pnl = dec!(0);
         self.consecutive_losses = 0;
     }
 }

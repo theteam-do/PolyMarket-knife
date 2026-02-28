@@ -2,7 +2,8 @@
 name = "follow-trade"
 version.workspace = true
 edition.workspace = true
-description = "Polymarket 跟单策略 - 复制聪明钱"
+description = "Polymarket 跟单策略"
+
 [dependencies]
 tokio.workspace = true
 serde.workspace = true
@@ -13,4 +14,7 @@ tracing-subscriber.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
 rust_decimal.workspace = true
+rust_decimal_macros.workspace = true
+polymarket-client-sdk.workspace = true
 config.workspace = true
+reqwest.workspace = true
