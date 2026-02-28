@@ -119,3 +119,125 @@ impl SignalGenerator {
         confidence.min(1.0)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_generator() -> SignalGenerator {
+        let config = StrategyConfig {
+            symbols: vec!["BTCUSDT".to_string()],
+            volatility_threshold: 0.02,
+            momentum_threshold: 0.01,
+            base_position_usd: 100.0,
+            max_position_usd: 10000.0,
+            confidence_high: 0.8,
+            max_loss_per_trade: 100.0,
+            max_daily_loss: 500.0,
+            stop_loss_pct: 0.1,
+        };
+        SignalGenerator::new(&config)
+    }
+
+    fn create_test_tick(price: f64, volume: f64) -> PriceTick {
+        PriceTick {
+            symbol: "BTCUSDT".to_string(),
+            price,
+            timestamp: 1234567890,
+            volume,
+        }
+    }
+
+    #[test]
+    fn test_no_signal_with_insufficient_data() {
+        let mut gen = create_test_generator();
+        
+        // Only 5 data points (need 10)
+        for i in 0..5 {
+            let tick = create_test_tick(50000.0 + i as f64, 1.0);
+            assert!(gen.generate(&tick).is_none());
+        }
+    }
+
+    #[test]
+    fn test_volatility_calculation() {
+        let mut gen = create_test_generator();
+        
+        // High volatility prices
+        let prices = vec![50000.0, 51000.0, 49000.0, 52000.0, 48000.0, 53000.0, 47000.0, 54000.0, 46000.0, 55000.0];
+        for (i, &price) in prices.iter().enumerate() {
+            let tick = create_test_tick(price, 10.0);
+            if i == prices.len() - 1 {
+                let signal = gen.generate(&tick);
+                // High volatility should generate signal
+                assert!(signal.is_some());
+            } else {
+                gen.generate(&tick);
+            }
+        }
+    }
+
+    #[test]
+    fn test_confidence_range() {
+        let mut gen = create_test_generator();
+        
+        // Create enough data
+        for i in 0..15 {
+            let price = 50000.0 * (1.0 + (i as f64 * 0.01));
+            let tick = create_test_tick(price, 10.0);
+            
+            if i == 14 {
+                if let Some(signal) = gen.generate(&tick) {
+                    assert!(signal.confidence() >= 0.0);
+                    assert!(signal.confidence() <= 1.0);
+                }
+            } else {
+                gen.generate(&tick);
+            }
+        }
+    }
+
+    #[test]
+    fn test_momentum_positive() {
+        let mut gen = create_test_generator();
+        
+        // Upward trend
+        for i in 0..15 {
+            let price = 50000.0 * (1.0 + i as f64 * 0.005);
+            let tick = create_test_tick(price, 10.0);
+            
+            if i == 14 {
+                if let Some(signal) = gen.generate(&tick) {
+                    match signal {
+                        Signal::Buy { .. } => {}, // Expected
+                        Signal::Sell { .. } => panic!("Expected Buy signal for upward trend"),
+                    }
+                }
+            } else {
+                gen.generate(&tick);
+            }
+        }
+    }
+
+    #[test]
+    fn test_momentum_negative() {
+        let mut gen = create_test_generator();
+        
+        // Downward trend
+        for i in 0..15 {
+            let price = 50000.0 * (1.0 - i as f64 * 0.005);
+            let tick = create_test_tick(price, 10.0);
+            
+            if i == 14 {
+                if let Some(signal) = gen.generate(&tick) {
+                    match signal {
+                        Signal::Sell { .. } => {}, // Expected
+                        Signal::Buy { .. } => panic!("Expected Sell signal for downward trend"),
+                    }
+                }
+            } else {
+                gen.generate(&tick);
+            }
+        }
+    }
+}

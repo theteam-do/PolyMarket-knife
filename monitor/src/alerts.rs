@@ -204,3 +204,94 @@ impl Default for AlertManager {
         Self::new(AlertConfig::default())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rust_decimal_macros::dec;
+
+    #[test]
+    fn test_alert_config_default() {
+        let config = AlertConfig::default();
+        
+        assert_eq!(config.daily_loss_threshold, dec!(500));
+        assert_eq!(config.daily_loss_warning_pct, 0.8);
+        assert_eq!(config.position_threshold, dec!(10000));
+        assert_eq!(config.latency_threshold_ms, 100.0);
+        assert_eq!(config.consecutive_loss_threshold, 5);
+    }
+
+    #[test]
+    fn test_daily_loss_warning() {
+        let mut alerts = AlertManager::default();
+        
+        let pnl = dec!(-450.0); // 90% of 500 threshold
+        let alert_list = alerts.check_daily_loss(pnl);
+        
+        assert!(!alert_list.is_empty());
+        assert_eq!(alert_list[0].severity, Severity::Warning);
+    }
+
+    #[test]
+    fn test_daily_loss_exceeded() {
+        let mut alerts = AlertManager::default();
+        
+        let pnl = dec!(-550.0); // Exceeds 500 threshold
+        let alert_list = alerts.check_daily_loss(pnl);
+        
+        assert!(!alert_list.is_empty());
+        assert_eq!(alert_list[0].severity, Severity::Critical);
+    }
+
+    #[test]
+    fn test_should_stop_trading() {
+        let mut alerts = AlertManager::default();
+        
+        // No critical alerts yet
+        assert!(!alerts.should_stop_trading());
+        
+        // Trigger critical alert
+        alerts.check_daily_loss(dec!(-550.0));
+        
+        assert!(alerts.should_stop_trading());
+    }
+
+    #[test]
+    fn test_alert_cooldown() {
+        let mut alerts = AlertManager::default();
+        
+        // First alert should trigger
+        let pnl = dec!(-550.0);
+        let first_alerts = alerts.check_daily_loss(pnl);
+        assert!(!first_alerts.is_empty());
+        
+        // Second alert within cooldown should not trigger
+        let second_alerts = alerts.check_daily_loss(pnl);
+        assert!(second_alerts.is_empty());
+    }
+
+    #[test]
+    fn test_consecutive_losses() {
+        let mut alerts = AlertManager::default();
+        
+        // 4 losses should not trigger
+        let alerts_list = alerts.check_consecutive_losses(4);
+        assert!(alerts_list.is_empty());
+        
+        // 5 losses should trigger
+        let alerts_list = alerts.check_consecutive_losses(5);
+        assert!(!alerts_list.is_empty());
+        assert_eq!(alerts_list[0].severity, Severity::Critical);
+    }
+
+    #[test]
+    fn test_clear_alerts() {
+        let mut alerts = AlertManager::default();
+        
+        alerts.check_daily_loss(dec!(-550.0));
+        assert!(!alerts.get_alerts().is_empty());
+        
+        alerts.clear_alerts();
+        assert!(alerts.get_alerts().is_empty());
+    }
+}

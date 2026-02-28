@@ -109,3 +109,111 @@ impl std::fmt::Display for ArbOpportunity {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_detector() -> Detector {
+        let config = StrategyConfig {
+            min_profit_usd: 0.02,
+            max_position_per_trade: 1000.0,
+            scan_interval_ms: 50,
+            gas_price_gwei: 50,
+            include_all: true,
+            exclude_market_ids: vec![],
+        };
+        Detector::new(&config)
+    }
+
+    fn create_test_market(yes: f64, no: f64) -> MarketPrice {
+        MarketPrice {
+            market_id: "test_market".to_string(),
+            token_id_yes: "yes_token".to_string(),
+            token_id_no: "no_token".to_string(),
+            yes_price: Decimal::from_f64_retain(yes).unwrap(),
+            no_price: Decimal::from_f64_retain(no).unwrap(),
+            volume_24h: Decimal::from_f64_retain(10000.0).unwrap(),
+        }
+    }
+
+    #[test]
+    fn test_detect_buy_arbitrage() {
+        let detector = create_test_detector();
+        let prices = vec![
+            create_test_market(0.40, 0.45), // sum = 0.85 < 1.0
+        ];
+
+        let opportunity = detector.detect(&prices);
+        
+        assert!(opportunity.is_some());
+        match opportunity.unwrap() {
+            ArbOpportunity::BuyAndMint { profit_per_share, .. } => {
+                assert!(profit_per_share > Decimal::ZERO);
+            }
+            _ => panic!("Expected BuyAndMint opportunity"),
+        }
+    }
+
+    #[test]
+    fn test_detect_sell_arbitrage() {
+        let detector = create_test_detector();
+        let prices = vec![
+            create_test_market(0.60, 0.55), // sum = 1.15 > 1.0
+        ];
+
+        let opportunity = detector.detect(&prices);
+        
+        assert!(opportunity.is_some());
+        match opportunity.unwrap() {
+            ArbOpportunity::RedeemAndSell { profit_per_share, .. } => {
+                assert!(profit_per_share > Decimal::ZERO);
+            }
+            _ => panic!("Expected RedeemAndSell opportunity"),
+        }
+    }
+
+    #[test]
+    fn test_no_arbitrage_opportunity() {
+        let detector = create_test_detector();
+        let prices = vec![
+            create_test_market(0.50, 0.49), // sum = 0.99, within threshold
+        ];
+
+        let opportunity = detector.detect(&prices);
+        
+        assert!(opportunity.is_none());
+    }
+
+    #[test]
+    fn test_invalid_prices() {
+        let detector = create_test_detector();
+        let prices = vec![
+            create_test_market(0.0, 0.0), // invalid prices
+        ];
+
+        let opportunity = detector.detect(&prices);
+        
+        assert!(opportunity.is_none());
+    }
+
+    #[test]
+    fn test_profit_calculation() {
+        let detector = create_test_detector();
+        let prices = vec![
+            create_test_market(0.40, 0.40), // sum = 0.80, profit = 0.20
+        ];
+
+        let opportunity = detector.detect(&prices);
+        
+        assert!(opportunity.is_some());
+        match opportunity.unwrap() {
+            ArbOpportunity::BuyAndMint { profit_per_share, max_shares, .. } => {
+                let expected_profit = Decimal::from_f64_retain(0.20).unwrap();
+                assert!((profit_per_share - expected_profit).abs() < Decimal::from_f64_retain(0.01).unwrap());
+                assert!(max_shares > Decimal::ZERO);
+            }
+            _ => panic!("Expected BuyAndMint opportunity"),
+        }
+    }
+}

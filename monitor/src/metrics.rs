@@ -152,3 +152,71 @@ impl Default for Timer {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_metrics_creation() {
+        let metrics = Metrics::new();
+        
+        assert_eq!(metrics.daily_pnl.get(), 0.0);
+        assert_eq!(metrics.total_pnl.get(), 0.0);
+        assert_eq!(metrics.orders_placed.get(), 0.0);
+    }
+
+    #[test]
+    fn test_record_order() {
+        let metrics = Metrics::new();
+        
+        metrics.record_order(OrderStatus::Filled, 50.0);
+        
+        assert_eq!(metrics.orders_placed.get(), 1.0);
+        assert_eq!(metrics.orders_filled.get(), 1.0);
+    }
+
+    #[test]
+    fn test_record_pnl() {
+        let metrics = Metrics::new();
+        
+        metrics.record_pnl(dec!(100.50));
+        
+        assert!(metrics.daily_pnl.get() > 100.0);
+        assert!(metrics.daily_pnl.get() < 101.0);
+    }
+
+    #[test]
+    fn test_record_loss() {
+        let metrics = Metrics::new();
+        
+        metrics.record_pnl(dec!(-50.0));
+        
+        assert!(metrics.daily_pnl.get() < -49.0);
+        assert!(metrics.max_drawdown.get() > 49.0);
+    }
+
+    #[test]
+    fn test_timer() {
+        let timer = Timer::new();
+        
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        
+        let elapsed = timer.elapsed_ms();
+        assert!(elapsed >= 10.0);
+        assert!(elapsed < 100.0);
+    }
+
+    #[test]
+    fn test_gather_metrics() {
+        let metrics = Metrics::new();
+        
+        metrics.orders_placed.inc();
+        metrics.orders_filled.inc();
+        
+        let output = metrics.gather();
+        
+        assert!(output.contains("orders_placed_total"));
+        assert!(output.contains("orders_filled_total"));
+    }
+}
