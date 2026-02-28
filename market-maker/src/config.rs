@@ -1,7 +1,10 @@
-use anyhow::Result;
+//! 配置模块 - 生产级配置管理
+
+use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::path::Path;
 
+/// 主配置
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub polygon: PolygonConfig,
@@ -10,6 +13,7 @@ pub struct Config {
     pub risk: RiskConfig,
 }
 
+/// Polygon 配置
 #[derive(Debug, Deserialize, Clone)]
 pub struct PolygonConfig {
     pub rpc_url: String,
@@ -17,6 +21,7 @@ pub struct PolygonConfig {
     pub private_key: String,
 }
 
+/// CLOB 配置
 #[derive(Debug, Deserialize, Clone)]
 pub struct ClobConfig {
     pub host: String,
@@ -24,6 +29,7 @@ pub struct ClobConfig {
     pub api_secret: Option<String>,
 }
 
+/// 策略配置
 #[derive(Debug, Deserialize, Clone)]
 pub struct StrategyConfig {
     pub market_ids: Vec<String>,
@@ -35,6 +41,7 @@ pub struct StrategyConfig {
     pub max_spread_bps: u32,
 }
 
+/// 风控配置
 #[derive(Debug, Deserialize, Clone)]
 pub struct RiskConfig {
     pub max_position_usd: f64,
@@ -45,9 +52,79 @@ pub struct RiskConfig {
 }
 
 impl Config {
+    /// 从文件加载配置
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let content = std::fs::read_to_string(path)?;
-        let config: Config = toml::from_str(&content)?;
+        let content = std::fs::read_to_string(path)
+            .with_context(|| "Failed to read config file")?;
+        
+        let config: Config = toml::from_str(&content)
+            .with_context(|| "Failed to parse config file")?;
+        
+        // 验证配置
+        config.validate()?;
+        
         Ok(config)
+    }
+
+    /// 从环境变量加载配置
+    pub fn from_env() -> Result<Self> {
+        Ok(Self {
+            polygon: PolygonConfig {
+                rpc_url: std::env::var("POLYGON_RPC_URL")
+                    .unwrap_or_else(|_| "https://polygon-rpc.com".to_string()),
+                private_key: std::env::var("POLYMARKET_PRIVATE_KEY")
+                    .unwrap_or_default(),
+            },
+            clob: ClobConfig {
+                host: std::env::var("CLOB_HOST")
+                    .unwrap_or_else(|_| "https://clob.polymarket.com".to_string()),
+                api_key: std::env::var("CLOB_API_KEY").ok(),
+                api_secret: std::env::var("CLOB_API_SECRET").ok(),
+            },
+            strategy: StrategyConfig {
+                market_ids: vec![],
+                spread_bps: 100,
+                order_size_usd: 1000.0,
+                refresh_interval_ms: 100,
+                skew_inventory: true,
+                min_spread_bps: 50,
+                max_spread_bps: 500,
+            },
+            risk: RiskConfig {
+                max_position_usd: 10000.0,
+                max_loss_per_day: 500.0,
+                stop_loss_pct: 5.0,
+                max_orders: 10,
+                max_order_size_usd: 5000.0,
+            },
+        })
+    }
+
+    /// 验证配置
+    fn validate(&self) -> Result<()> {
+        // 验证私钥
+        if self.polygon.private_key.is_empty() {
+            anyhow::bail!("Private key is required. Set POLYMARKET_PRIVATE_KEY environment variable");
+        }
+
+        // 验证价差
+        if self.strategy.spread_bps < self.strategy.min_spread_bps {
+            anyhow::bail!("spread_bps cannot be less than min_spread_bps");
+        }
+
+        if self.strategy.spread_bps > self.strategy.max_spread_bps {
+            anyhow::bail!("spread_bps cannot be greater than max_spread_bps");
+        }
+
+        // 验证风控
+        if self.risk.max_loss_per_day <= 0.0 {
+            anyhow::bail!("max_loss_per_day must be positive");
+        }
+
+        if self.risk.max_position_usd <= 0.0 {
+            anyhow::bail!("max_position_usd must be positive");
+        }
+
+        Ok(())
     }
 }

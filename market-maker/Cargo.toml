@@ -2,7 +2,7 @@
 name = "market-maker"
 version.workspace = true
 edition.workspace = true
-description = "Polymarket 返佣做市策略 - 极致低延迟"
+description = "Polymarket 返佣做市策略 - 生产级实现"
 
 [dependencies]
 tokio.workspace = true
@@ -14,14 +14,11 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
-parking_lot.workspace = true
 rust_decimal.workspace = true
 rust_decimal_macros.workspace = true
+chrono.workspace = true
 config.workspace = true
-polymarket-client-sdk = { workspace = true, features = ["clob", "ws", "tracing"] }
-uuid.workspace = true
-alloy.workspace = true
-async-trait.workspace = true
+polymarket-client-sdk.workspace = true
 
 [dev-dependencies]
 mockall.workspace = true
