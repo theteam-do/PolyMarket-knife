@@ -131,3 +131,128 @@ impl NLPEngine {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::collector::NewsItem;
+
+    fn create_test_nlp_engine() -> NLPEngine {
+        let sources = SourcesConfig {
+            news_apis: vec![],
+            keywords: vec!["election".to_string(), "fed".to_string()],
+            gov_websites: vec![],
+        };
+        NLPEngine::new(&sources)
+    }
+
+    #[test]
+    fn test_keyword_matching() {
+        let engine = create_test_nlp_engine();
+        
+        let text = "The election results are coming soon";
+        let keywords = engine.match_keywords(text);
+        
+        assert!(!keywords.is_empty());
+        assert!(keywords.contains(&"election".to_string()));
+    }
+
+    #[test]
+    fn test_sentiment_positive() {
+        let engine = create_test_nlp_engine();
+        
+        let text = "win success approve yes positive gain";
+        let score = engine.simple_sentiment(text);
+        
+        assert!(score > 0.0, "Should be positive sentiment");
+    }
+
+    #[test]
+    fn test_sentiment_negative() {
+        let engine = create_test_nlp_engine();
+        
+        let text = "lose fail reject no negative drop";
+        let score = engine.simple_sentiment(text);
+        
+        assert!(score < 0.0, "Should be negative sentiment");
+    }
+
+    #[test]
+    fn test_sentiment_neutral() {
+        let engine = create_test_nlp_engine();
+        
+        let text = "the weather is nice today";
+        let score = engine.simple_sentiment(text);
+        
+        assert_eq!(score, 0.0, "Should be neutral");
+    }
+
+    #[test]
+    fn test_recency_score() {
+        let engine = create_test_nlp_engine();
+        
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        
+        // Recent news (< 60s)
+        assert_eq!(engine.calc_recency(now - 30), 1.0);
+        
+        // 5 minutes old
+        assert_eq!(engine.calc_recency(now - 120), 0.8);
+        
+        // 1 hour old
+        assert_eq!(engine.calc_recency(now - 3600), 0.5);
+        
+        // Old news (> 1 day)
+        assert_eq!(engine.calc_recency(now - 100000), 0.0);
+    }
+
+    #[test]
+    fn test_analyze_news() {
+        let engine = create_test_nlp_engine();
+        
+        let item = NewsItem {
+            source: "test".to_string(),
+            title: "Election win confirmed".to_string(),
+            content: "Positive results".to_string(),
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            market: Some("market1".to_string()),
+        };
+        
+        let result = engine.analyze(&item);
+        
+        assert!(result.confidence > 0.0);
+        assert_eq!(result.direction, Direction::Yes);
+        assert!(!result.keywords_matched.is_empty());
+    }
+}
+#[cfg(test)]
+    use super::*;
+
+    #[test]
+    fn test_recency_score_fixed() {
+        let engine = create_test_nlp_engine();
+        
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        
+        // Recent news (< 60s) - should be 1.0
+        assert_eq!(engine.calc_recency(now - 30), 1.0);
+        
+        // 2 minutes old (< 300s) - should be 0.8
+        assert_eq!(engine.calc_recency(now - 120), 0.8);
+        
+        // 10 minutes old (< 3600s) - should be 0.5
+        assert_eq!(engine.calc_recency(now - 600), 0.5);
+        
+        // Old news (> 1 day) - should be 0.0
+        assert_eq!(engine.calc_recency(now - 100000), 0.0);
+    }
+}
