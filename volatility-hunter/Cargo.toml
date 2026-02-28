@@ -20,5 +20,4 @@ ordered-float.workspace = true
 bytes.workspace = true
 config.workspace = true
 futures-util.workspace = true
-poly-adapter = { path = "../poly-adapter" }
 tokio-tungstenite = "0.28"
