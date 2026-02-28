@@ -44,7 +44,7 @@ impl RiskManager {
 
     pub fn update_pnl(&mut self, pnl: Decimal) {
         self.daily_pnl += pnl;
-        
+
         if pnl < dec!(0) {
             self.consecutive_losses += 1;
         } else {

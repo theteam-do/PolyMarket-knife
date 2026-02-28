@@ -21,7 +21,7 @@ impl Scanner {
     pub async fn scan(&self) -> Result<Vec<MarketPrice>> {
         // TODO: 从 Gamma API 获取市场数据
         warn!("Scanner.scan() - using mock data");
-        
+
         Ok(vec![MarketPrice {
             market_id: "mock_market".to_string(),
             token_id_yes: "yes_token".to_string(),

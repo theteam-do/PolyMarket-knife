@@ -1,9 +1,9 @@
 //! 攻击执行器
-//! 
+//!
 //! ⚠️ 以下方法仅供学习理解攻击原理 ⚠️
 
 use anyhow::Result;
-use tracing::{instrument};
+use tracing::instrument;
 
 use crate::config::Config;
 use crate::scanner::TargetMarket;
@@ -52,7 +52,7 @@ impl AttackExecutor {
         // TODO: 实现
         // 发送 Gas 限制过低的交易
         // 交易会在链上失败，但会清空匹配的订单
-        
+
         tracing::info!("Executing low gas attack (not implemented)");
         Ok(())
     }
@@ -61,7 +61,7 @@ impl AttackExecutor {
         // TODO: 实现
         // 发送多个交易但跳过某些 nonce
         // 造成交易顺序混乱
-        
+
         tracing::info!("Executing nonce gap attack (not implemented)");
         Ok(())
     }
@@ -70,7 +70,7 @@ impl AttackExecutor {
         // TODO: 实现
         // 用不足余额发起匹配请求
         // 交易失败但清空对手订单
-        
+
         tracing::info!("Executing insufficient balance attack (not implemented)");
         Ok(())
     }

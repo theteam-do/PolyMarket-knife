@@ -45,12 +45,10 @@ impl Executor {
     /// 创建新的执行器 (生产环境)
     #[cfg(not(test))]
     pub fn new(config: &Config) -> Result<Self> {
-        let order_size = Decimal::from_f64_retain(config.strategy.order_size_usd)
-            .unwrap_or(dec!(1000));
+        let order_size =
+            Decimal::from_f64_retain(config.strategy.order_size_usd).unwrap_or(dec!(1000));
 
-        Ok(Self {
-            order_size,
-        })
+        Ok(Self { order_size })
     }
 
     /// 创建新的执行器 (测试环境)
@@ -72,19 +70,27 @@ impl Executor {
                 return Ok(ob.clone());
             }
         }
-        
+
         // 生产环境返回空订单簿
         Ok(OrderBook::new(token_id.to_string()))
     }
 
     /// 下双边订单
     #[instrument(skip(self), fields(token_id = %token_id))]
-    pub async fn place_orders(&self, token_id: &str, bid_price: f64, ask_price: f64) -> Result<(Option<String>, Option<String>)> {
+    pub async fn place_orders(
+        &self,
+        token_id: &str,
+        bid_price: f64,
+        ask_price: f64,
+    ) -> Result<(Option<String>, Option<String>)> {
         let bid_dec = Decimal::from_f64_retain(bid_price).unwrap_or(dec!(0.50));
         let ask_dec = Decimal::from_f64_retain(ask_price).unwrap_or(dec!(0.50));
         let _size = self.order_size;
 
-        info!("Placing orders for {}: bid={}, ask={}", token_id, bid_dec, ask_dec);
+        info!(
+            "Placing orders for {}: bid={}, ask={}",
+            token_id, bid_dec, ask_dec
+        );
 
         #[cfg(test)]
         {
@@ -113,7 +119,7 @@ impl Executor {
                 return Err(anyhow::anyhow!("Cancel failed"));
             }
         }
-        
+
         Ok(())
     }
 
@@ -132,7 +138,7 @@ mod tests {
     async fn test_executor_creation() {
         let mock = MockResponses::default();
         let executor = Executor::new_test(dec!(1000), mock);
-        
+
         assert_eq!(executor.order_size, dec!(1000));
     }
 
@@ -140,9 +146,9 @@ mod tests {
     async fn test_fetch_orderbook() {
         let mock = MockResponses::default();
         let executor = Executor::new_test(dec!(1000), mock);
-        
+
         let result = executor.fetch_orderbook("test_token").await;
-        
+
         assert!(result.is_ok());
         let ob = result.unwrap();
         assert_eq!(ob.token_id, "test");
@@ -154,9 +160,12 @@ mod tests {
     async fn test_place_orders_success() {
         let mock = MockResponses::default();
         let executor = Executor::new_test(dec!(1000), mock);
-        
-        let (buy_id, sell_id) = executor.place_orders("test_token", 0.50, 0.52).await.unwrap();
-        
+
+        let (buy_id, sell_id) = executor
+            .place_orders("test_token", 0.50, 0.52)
+            .await
+            .unwrap();
+
         assert!(buy_id.is_some());
         assert!(sell_id.is_some());
         assert_eq!(buy_id.unwrap(), "mock_buy");
@@ -167,10 +176,13 @@ mod tests {
     async fn test_place_orders_failure() {
         let mut mock = MockResponses::default();
         mock.place_order_success = false;
-        
+
         let executor = Executor::new_test(dec!(1000), mock);
-        let (buy_id, sell_id) = executor.place_orders("test_token", 0.50, 0.52).await.unwrap();
-        
+        let (buy_id, sell_id) = executor
+            .place_orders("test_token", 0.50, 0.52)
+            .await
+            .unwrap();
+
         assert!(buy_id.is_none());
         assert!(sell_id.is_none());
     }
@@ -179,9 +191,9 @@ mod tests {
     async fn test_cancel_orders() {
         let mock = MockResponses::default();
         let executor = Executor::new_test(dec!(1000), mock);
-        
+
         let result = executor.cancel_orders("market1").await;
-        
+
         assert!(result.is_ok());
     }
 
@@ -189,10 +201,10 @@ mod tests {
     async fn test_cancel_orders_failure() {
         let mut mock = MockResponses::default();
         mock.cancel_success = false;
-        
+
         let executor = Executor::new_test(dec!(1000), mock);
         let result = executor.cancel_orders("market1").await;
-        
+
         assert!(result.is_err());
     }
 
@@ -200,9 +212,9 @@ mod tests {
     async fn test_cancel_all_orders() {
         let mock = MockResponses::default();
         let executor = Executor::new_test(dec!(1000), mock);
-        
+
         let result = executor.cancel_all_orders().await;
-        
+
         assert!(result.is_ok());
     }
 
@@ -210,7 +222,7 @@ mod tests {
     async fn test_order_size() {
         let mock = MockResponses::default();
         let executor = Executor::new_test(dec!(500), mock);
-        
+
         assert_eq!(executor.order_size, dec!(500));
     }
 
@@ -218,7 +230,7 @@ mod tests {
     async fn test_multiple_place_orders() {
         let mock = MockResponses::default();
         let executor = Executor::new_test(dec!(1000), mock);
-        
+
         // 下 3 次订单
         for _ in 0..3 {
             let (buy_id, sell_id) = executor.place_orders("test", 0.50, 0.52).await.unwrap();
@@ -231,12 +243,12 @@ mod tests {
     async fn test_price_validation() {
         let mock = MockResponses::default();
         let executor = Executor::new_test(dec!(1000), mock);
-        
+
         // 测试边界价格
         let (buy_id, sell_id) = executor.place_orders("test", 0.01, 0.99).await.unwrap();
         assert!(buy_id.is_some());
         assert!(sell_id.is_some());
-        
+
         // 测试零价格
         let (buy_id, sell_id) = executor.place_orders("test", 0.0, 0.0).await.unwrap();
         assert!(buy_id.is_some());
@@ -248,11 +260,11 @@ mod tests {
         // 测试部分失败场景
         let mock = MockResponses::default();
         let executor = Executor::new_test(dec!(1000), mock);
-        
+
         // 当前实现是全部成功或全部失败
         // 可以扩展 MockResponses 支持更细粒度的控制
         let (buy_id, sell_id) = executor.place_orders("test", 0.50, 0.52).await.unwrap();
-        
+
         // 要么都成功，要么都失败
         assert_eq!(buy_id.is_some(), sell_id.is_some());
     }
@@ -261,10 +273,10 @@ mod tests {
     async fn test_orderbook_empty() {
         let mut mock = MockResponses::default();
         mock.orderbook = None;
-        
+
         let executor = Executor::new_test(dec!(1000), mock);
         let result = executor.fetch_orderbook("test").await;
-        
+
         // 当 mock 为空时，返回空订单簿
         assert!(result.is_ok());
     }

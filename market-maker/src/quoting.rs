@@ -32,7 +32,7 @@ impl Quoter {
         effective_spread = effective_spread.clamp(self.min_spread_bps, self.max_spread_bps);
 
         let half_spread = mid_price * effective_spread / 2.0;
-        
+
         let mut bid = mid_price - half_spread;
         let mut ask = mid_price + half_spread;
 
@@ -47,7 +47,7 @@ impl Quoter {
 
         bid = bid.clamp(0.01, 0.99);
         ask = ask.clamp(0.01, 0.99);
-        
+
         if bid >= ask {
             let mid = (bid + ask) / 2.0;
             let half = (ask - bid).abs() / 2.0 + 0.01;
@@ -88,7 +88,7 @@ mod tests {
     fn test_calculate_quotes_basic() {
         let quoter = create_test_quoter(100);
         let (bid, ask) = quoter.calculate_quotes(0.50);
-        
+
         assert!(bid < ask, "Bid should be less than ask");
         assert!(bid >= 0.01 && bid <= 0.99, "Bid should be in valid range");
         assert!(ask >= 0.01 && ask <= 0.99, "Ask should be in valid range");
@@ -98,7 +98,7 @@ mod tests {
     fn test_calculate_quotes_zero_price() {
         let quoter = create_test_quoter(100);
         let (bid, ask) = quoter.calculate_quotes(0.0);
-        
+
         assert_eq!(bid, 0.0);
         assert_eq!(ask, 0.0);
     }
@@ -107,7 +107,7 @@ mod tests {
     fn test_quotes_within_range() {
         let quoter = create_test_quoter(100);
         let (bid, ask) = quoter.calculate_quotes(0.99);
-        
+
         assert!(bid <= 0.99);
         assert!(ask <= 0.99);
     }
@@ -116,7 +116,7 @@ mod tests {
     fn test_spread_calculation() {
         let quoter = create_test_quoter(100);
         let (bid, ask) = quoter.calculate_quotes(0.50);
-        
+
         let spread = ask - bid;
         assert!(spread > 0.0, "Spread should be positive");
         assert!(spread >= 0.0025, "Spread should be at least 0.5%");
@@ -134,10 +134,10 @@ mod tests {
             max_spread_bps: 200,
         };
         let quoter = Quoter::new(&config);
-        
+
         let (bid, ask) = quoter.calculate_quotes(0.50);
         let spread_bps = ((ask - bid) / ((bid + ask) / 2.0)) * 10000.0;
-        
+
         assert!(spread_bps >= 50.0, "Should enforce min spread");
         assert!(spread_bps <= 200.0, "Should enforce max spread");
     }

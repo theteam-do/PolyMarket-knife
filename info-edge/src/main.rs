@@ -1,23 +1,23 @@
 //! Info Edge - 信息差交易策略
-//! 
+//!
 //! ⚠️ 警告：本策略可能涉及法律风险，仅供学习研究
-//! 
+//!
 //! 核心逻辑：NLP 监控新闻源，比市场更早知道重大事件
 
 use anyhow::{Context, Result};
-use tracing::{info, warn, error, instrument};
+use tracing::{error, info, instrument, warn};
 
-mod config;
 mod collector;
+mod compliance;
+mod config;
 mod nlp;
 mod signal;
-mod compliance;
 
-use config::Config;
 use collector::NewsCollector;
+use compliance::ComplianceChecker;
+use config::Config;
 use nlp::NLPEngine;
 use signal::SignalGenerator;
-use compliance::ComplianceChecker;
 
 pub struct InfoTrader {
     config: Config,
@@ -46,13 +46,11 @@ impl InfoTrader {
         info!("📰 Info Trader starting...");
         info!("Monitoring {} news sources", self.collector.source_count());
 
-        let mut interval = tokio::time::interval(
-            tokio::time::Duration::from_secs(1)
-        );
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
 
         while self.running {
             interval.tick().await;
-            
+
             if let Err(e) = self.tick().await {
                 error!("Tick error: {}", e);
             }
@@ -111,7 +109,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("info_edge=info".parse()?)
+                .add_directive("info_edge=info".parse()?),
         )
         .json()
         .init();
@@ -120,12 +118,11 @@ async fn main() -> Result<()> {
     let config_path = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "config/info-edge.toml".to_string());
-    
-    let config = Config::load(&config_path)
-        .context("Failed to load config")?;
+
+    let config = Config::load(&config_path).context("Failed to load config")?;
 
     let mut trader = InfoTrader::new(config);
-    
+
     // 处理信号
     tokio::spawn(async move {
         tokio::signal::ctrl_c().await.unwrap();

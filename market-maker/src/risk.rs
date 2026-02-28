@@ -78,10 +78,10 @@ mod tests {
     #[test]
     fn test_can_trade_after_loss() {
         let mut risk = create_test_risk_manager();
-        
+
         risk.update_pnl(-400.0);
         assert!(risk.can_trade());
-        
+
         risk.update_pnl(-150.0);
         assert!(!risk.can_trade());
     }
@@ -89,10 +89,10 @@ mod tests {
     #[test]
     fn test_update_pnl() {
         let mut risk = create_test_risk_manager();
-        
+
         risk.update_pnl(100.0);
         assert_eq!(risk.daily_pnl(), 100.0);
-        
+
         risk.update_pnl(-50.0);
         assert_eq!(risk.daily_pnl(), 50.0);
     }
@@ -100,20 +100,20 @@ mod tests {
     #[test]
     fn test_reset_daily() {
         let mut risk = create_test_risk_manager();
-        
+
         risk.update_pnl(-100.0);
         risk.reset_daily();
-        
+
         assert_eq!(risk.daily_pnl(), 0.0);
     }
 
     #[test]
     fn test_stop_resume_trading() {
         let mut risk = create_test_risk_manager();
-        
+
         risk.stop_trading();
         assert!(!risk.can_trade());
-        
+
         risk.resume_trading();
         assert!(risk.can_trade());
     }

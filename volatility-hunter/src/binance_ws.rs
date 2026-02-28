@@ -5,7 +5,7 @@ use futures_util::StreamExt;
 use serde::Deserialize;
 use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 use crate::config::BinanceConfig;
 use crate::PriceTick;
@@ -21,16 +21,12 @@ impl BinanceFeed {
         }
     }
 
-    pub async fn stream(
-        &self,
-        tx: mpsc::Sender<PriceTick>,
-        symbols: Vec<String>,
-    ) -> Result<()> {
+    pub async fn stream(&self, tx: mpsc::Sender<PriceTick>, symbols: Vec<String>) -> Result<()> {
         let streams: Vec<String> = symbols
             .iter()
             .map(|s| format!("{}@trade", s.to_lowercase()))
             .collect();
-        
+
         let stream_path = streams.join("/");
         let url = format!("{}/{}", self.config.ws_url, stream_path);
 
@@ -94,7 +90,7 @@ fn parse_trade(text: &str) -> Option<PriceTick> {
     }
 
     let trade: BinanceTrade = serde_json::from_str(text).ok()?;
-    
+
     if trade.e != "trade" {
         return None;
     }

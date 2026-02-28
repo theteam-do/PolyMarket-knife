@@ -21,7 +21,7 @@ impl ChainMonitor {
     pub async fn fetch_trades(&self) -> Result<Vec<TradeEvent>> {
         // TODO: 从 Data API 获取聪明钱交易
         warn!("fetch_trades() - using mock data");
-        
+
         Ok(vec![TradeEvent {
             from: "0xSmartMoney".to_string(),
             market: "mock_market".to_string(),

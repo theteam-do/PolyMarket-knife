@@ -44,7 +44,7 @@ impl Detector {
     pub fn detect(&self, prices: &[MarketPrice]) -> Option<ArbOpportunity> {
         for market in prices {
             let sum = market.yes_price + market.no_price;
-            
+
             if sum <= dec!(0.01) {
                 continue;
             }
@@ -53,7 +53,7 @@ impl Detector {
             if sum < dec!(1) - self.min_profit {
                 let profit_per_share = dec!(1) - sum;
                 let max_shares = (self.max_position / sum).min(dec!(1000));
-                
+
                 return Some(ArbOpportunity::BuyAndMint {
                     market_id: market.market_id.clone(),
                     token_id_yes: market.token_id_yes.clone(),
@@ -62,12 +62,12 @@ impl Detector {
                     max_shares,
                 });
             }
-            
+
             // 卖出套利：Yes + No > $1
             if sum > dec!(1) + self.min_profit {
                 let profit_per_share = sum - dec!(1);
                 let max_shares = self.max_position.min(dec!(1000));
-                
+
                 return Some(ArbOpportunity::RedeemAndSell {
                     market_id: market.market_id.clone(),
                     token_id_yes: market.token_id_yes.clone(),
@@ -88,7 +88,11 @@ impl Detector {
 impl std::fmt::Display for ArbOpportunity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ArbOpportunity::BuyAndMint { profit_per_share, max_shares, .. } => {
+            ArbOpportunity::BuyAndMint {
+                profit_per_share,
+                max_shares,
+                ..
+            } => {
                 write!(
                     f,
                     "BuyAndMint: profit/share=${} shares={} total=${}",
@@ -97,7 +101,11 @@ impl std::fmt::Display for ArbOpportunity {
                     profit_per_share * max_shares
                 )
             }
-            ArbOpportunity::RedeemAndSell { profit_per_share, max_shares, .. } => {
+            ArbOpportunity::RedeemAndSell {
+                profit_per_share,
+                max_shares,
+                ..
+            } => {
                 write!(
                     f,
                     "RedeemAndSell: profit/share=${} shares={} total=${}",
@@ -145,10 +153,12 @@ mod tests {
         ];
 
         let opportunity = detector.detect(&prices);
-        
+
         assert!(opportunity.is_some());
         match opportunity.unwrap() {
-            ArbOpportunity::BuyAndMint { profit_per_share, .. } => {
+            ArbOpportunity::BuyAndMint {
+                profit_per_share, ..
+            } => {
                 assert!(profit_per_share > Decimal::ZERO);
             }
             _ => panic!("Expected BuyAndMint opportunity"),
@@ -163,10 +173,12 @@ mod tests {
         ];
 
         let opportunity = detector.detect(&prices);
-        
+
         assert!(opportunity.is_some());
         match opportunity.unwrap() {
-            ArbOpportunity::RedeemAndSell { profit_per_share, .. } => {
+            ArbOpportunity::RedeemAndSell {
+                profit_per_share, ..
+            } => {
                 assert!(profit_per_share > Decimal::ZERO);
             }
             _ => panic!("Expected RedeemAndSell opportunity"),
@@ -181,7 +193,7 @@ mod tests {
         ];
 
         let opportunity = detector.detect(&prices);
-        
+
         assert!(opportunity.is_none());
     }
 
@@ -193,7 +205,7 @@ mod tests {
         ];
 
         let opportunity = detector.detect(&prices);
-        
+
         assert!(opportunity.is_none());
     }
 
@@ -205,12 +217,19 @@ mod tests {
         ];
 
         let opportunity = detector.detect(&prices);
-        
+
         assert!(opportunity.is_some());
         match opportunity.unwrap() {
-            ArbOpportunity::BuyAndMint { profit_per_share, max_shares, .. } => {
+            ArbOpportunity::BuyAndMint {
+                profit_per_share,
+                max_shares,
+                ..
+            } => {
                 let expected_profit = Decimal::from_f64_retain(0.20).unwrap();
-                assert!((profit_per_share - expected_profit).abs() < Decimal::from_f64_retain(0.01).unwrap());
+                assert!(
+                    (profit_per_share - expected_profit).abs()
+                        < Decimal::from_f64_retain(0.01).unwrap()
+                );
                 assert!(max_shares > Decimal::ZERO);
             }
             _ => panic!("Expected BuyAndMint opportunity"),

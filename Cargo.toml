@@ -64,6 +64,7 @@ config = "0.15"
 
 # Futures
 futures-util = "0.3"
+async-trait = "0.1"
 
 # 区块链 (官方 SDK 使用)
 alloy = { version = "1.6", default-features = false, features = ["signer-local"] }
@@ -88,4 +89,3 @@ debug = false
 # 测试依赖
 [workspace.dependencies.mockall]
 version = "0.13"
-async-trait = "0.1"

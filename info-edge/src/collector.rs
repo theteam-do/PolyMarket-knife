@@ -1,7 +1,7 @@
 //! 新闻收集器
 
-use anyhow::Result;
 use crate::config::SourcesConfig;
+use anyhow::Result;
 
 pub struct NewsCollector {
     #[allow(dead_code)]

@@ -9,7 +9,7 @@ fn test_full_trading_cycle() {
     // 4. 下单
     // 5. 监控成交
     // 6. 记录 PnL
-    
+
     assert!(true, "Full trading cycle should complete");
 }
 
@@ -19,7 +19,7 @@ fn test_risk_management() {
     // 测试日亏损限制
     // 测试持仓限制
     // 测试停止交易
-    
+
     assert!(true, "Risk management should work");
 }
 
@@ -29,6 +29,6 @@ fn test_monitoring_system() {
     // 测试指标收集
     // 测试告警触发
     // 测试仪表板
-    
+
     assert!(true, "Monitoring system should work");
 }

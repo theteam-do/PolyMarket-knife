@@ -53,7 +53,7 @@ impl RiskManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::monitor::{TradeEvent, Side};
+    use crate::monitor::{Side, TradeEvent};
 
     fn create_test_risk_manager() -> RiskManager {
         let config = StrategyConfig {
@@ -91,10 +91,10 @@ mod tests {
     #[test]
     fn test_min_trade_size() {
         let risk = create_test_risk_manager();
-        
+
         let trade_small = create_test_trade(Side::Buy, 100.0);
         assert!(!risk.can_trade(&trade_small));
-        
+
         let trade_ok = create_test_trade(Side::Buy, 1000.0);
         assert!(risk.can_trade(&trade_ok));
     }
@@ -102,9 +102,9 @@ mod tests {
     #[test]
     fn test_update_position() {
         let mut risk = create_test_risk_manager();
-        
+
         risk.update_position("market1", 100.0);
-        
+
         let pos = risk.positions.get("market1").unwrap();
         assert_eq!(*pos, 100.0);
     }
@@ -112,10 +112,10 @@ mod tests {
     #[test]
     fn test_update_pnl() {
         let mut risk = create_test_risk_manager();
-        
+
         risk.update_pnl(50.0);
         assert_eq!(risk.daily_pnl, 50.0);
-        
+
         risk.update_pnl(-30.0);
         assert_eq!(risk.daily_pnl, 20.0);
     }
@@ -123,10 +123,10 @@ mod tests {
     #[test]
     fn test_reset_daily() {
         let mut risk = create_test_risk_manager();
-        
+
         risk.update_pnl(100.0);
         risk.reset_daily();
-        
+
         assert_eq!(risk.daily_pnl, 0.0);
     }
 }

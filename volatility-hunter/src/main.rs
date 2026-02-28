@@ -3,17 +3,17 @@
 use anyhow::{Context, Result};
 use tracing::{info, warn};
 
-mod config;
 mod binance_ws;
-mod signal;
+mod config;
 mod executor;
 mod risk;
+mod signal;
 
-use config::Config;
 use binance_ws::BinanceFeed;
-use signal::SignalGenerator;
+use config::Config;
 use executor::Executor;
 use risk::RiskManager;
+use signal::SignalGenerator;
 
 pub struct Hunter {
     config: Config,
@@ -46,7 +46,7 @@ impl Hunter {
         // 启动币安数据流
         let (tx, mut rx) = tokio::sync::mpsc::channel(1000);
         let binance_feed = BinanceFeed::new(&self.config.binance);
-        
+
         let symbols = self.config.strategy.symbols.clone();
         tokio::spawn(async move {
             if let Err(e) = binance_feed.stream(tx, symbols).await {
@@ -65,8 +65,10 @@ impl Hunter {
                         signals_generated += 1;
                         trades_executed += 1;
                         total_pnl += profit;
-                        info!("Signals: {} Trades: {} PnL: ${}", 
-                              signals_generated, trades_executed, total_pnl);
+                        info!(
+                            "Signals: {} Trades: {} PnL: ${}",
+                            signals_generated, trades_executed, total_pnl
+                        );
                     }
                     Ok(None) => {}
                     Err(e) => {
@@ -76,8 +78,10 @@ impl Hunter {
             }
         }
 
-        info!("Hunter stopped. Signals: {} Trades: {} PnL: ${}", 
-              signals_generated, trades_executed, total_pnl);
+        info!(
+            "Hunter stopped. Signals: {} Trades: {} PnL: ${}",
+            signals_generated, trades_executed, total_pnl
+        );
         Ok(())
     }
 
@@ -124,7 +128,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("volatility_hunter=info".parse()?)
+                .add_directive("volatility_hunter=info".parse()?),
         )
         .json()
         .init();
@@ -132,12 +136,11 @@ async fn main() -> Result<()> {
     let config_path = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "config/volatility-hunter.toml".to_string());
-    
-    let config = Config::load(&config_path)
-        .context("Failed to load config")?;
+
+    let config = Config::load(&config_path).context("Failed to load config")?;
 
     let mut hunter = Hunter::new(config)?;
-    
+
     tokio::spawn(async move {
         tokio::signal::ctrl_c().await.unwrap();
         info!("Shutting down...");

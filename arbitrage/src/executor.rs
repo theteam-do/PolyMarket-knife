@@ -32,13 +32,13 @@ impl Executor {
                     "Executing BuyAndMint: shares={} profit/share={}",
                     max_shares, profit_per_share
                 );
-                
+
                 // TODO: 实际执行套利逻辑
                 // 1. 买入 Yes 代币
                 // 2. 买入 No 代币
                 // 3. 调用合约 mint
                 // 4. 调用合约 redeem
-                
+
                 Ok(*max_shares * dec!(0.02))
             }
             ArbOpportunity::RedeemAndSell { .. } => {

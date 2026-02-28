@@ -20,11 +20,13 @@ rust_decimal_macros.workspace = true
 config.workspace = true
 polymarket-client-sdk = { workspace = true, features = ["clob", "ws", "tracing"] }
 uuid.workspace = true
-alloy = { workspace = true, features = ["signer-local"] }
+alloy.workspace = true
+async-trait.workspace = true
 
 [dev-dependencies]
-mockall = { workspace = true }
+mockall.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
+criterion = { version = "0.5", features = ["html_reports"] }
 
 [[test]]
 name = "integration_test"
@@ -33,12 +35,6 @@ path = "../tests/integration_test.rs"
 [[test]]
 name = "e2e_test"
 path = "../tests/e2e_test.rs"
-async-trait = { workspace = true }
-
-[dev-dependencies]
-criterion = { version = "0.5", features = ["html_reports"] }
-mockall = { workspace = true }
-tokio = { workspace = true, features = ["test-util"] }
 
 [[bench]]
 name = "order_book_bench"

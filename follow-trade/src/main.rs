@@ -4,13 +4,13 @@ use anyhow::{Context, Result};
 use tracing::{info, warn};
 
 mod config;
-mod monitor;
 mod copier;
+mod monitor;
 mod risk;
 
 use config::Config;
-use monitor::ChainMonitor;
 use copier::TradeCopier;
+use monitor::ChainMonitor;
 use risk::RiskManager;
 
 pub struct Follower {
@@ -39,18 +39,19 @@ impl Follower {
     pub async fn run(&mut self) -> Result<()> {
         self.running = true;
         info!("Follow Trader starting...");
-        info!("Monitoring {} smart addresses", self.config.strategy.smart_addresses.len());
-
-        let mut interval = tokio::time::interval(
-            tokio::time::Duration::from_millis(100)
+        info!(
+            "Monitoring {} smart addresses",
+            self.config.strategy.smart_addresses.len()
         );
+
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(100));
 
         let mut trades_copied = 0u32;
         let mut total_pnl = rust_decimal::Decimal::ZERO;
 
         while self.running {
             interval.tick().await;
-            
+
             match self.tick().await {
                 Ok(Some(profit)) => {
                     trades_copied += 1;
@@ -64,7 +65,10 @@ impl Follower {
             }
         }
 
-        info!("Follow Trader stopped. Copied: {} PnL: ${}", trades_copied, total_pnl);
+        info!(
+            "Follow Trader stopped. Copied: {} PnL: ${}",
+            trades_copied, total_pnl
+        );
         Ok(())
     }
 
@@ -103,7 +107,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("follow_trade=info".parse()?)
+                .add_directive("follow_trade=info".parse()?),
         )
         .json()
         .init();
@@ -111,12 +115,11 @@ async fn main() -> Result<()> {
     let config_path = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "config/follow-trade.toml".to_string());
-    
-    let config = Config::load(&config_path)
-        .context("Failed to load config")?;
+
+    let config = Config::load(&config_path).context("Failed to load config")?;
 
     let mut follower = Follower::new(config)?;
-    
+
     tokio::spawn(async move {
         tokio::signal::ctrl_c().await.unwrap();
         info!("Shutting down...");

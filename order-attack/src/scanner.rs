@@ -1,7 +1,7 @@
 //! 目标扫描器
 
-use anyhow::Result;
 use crate::config::StrategyConfig;
+use anyhow::Result;
 
 pub struct TargetScanner {
     #[allow(dead_code)]
@@ -23,6 +23,6 @@ impl TargetScanner {
 #[derive(Debug)]
 pub struct TargetMarket {
     pub market: String,
-    pub liquidity_usd: f64,
-    pub market_makers: Vec<String>,
+    // pub liquidity_usd: f64,
+    // pub market_makers: Vec<String>,
 }

@@ -1,24 +1,24 @@
 //! Order Attack - 订单攻击策略
-//! 
+//!
 //! ⚠️⚠️⚠️ 高风险警告：仅供测试网学习使用 ⚠️⚠️⚠️
-//! 
+//!
 //! 主网使用可能导致：
 //! - 永久封号
 //! - 法律诉讼
 //! - 社区抵制
 
-use anyhow::{Context, Result, anyhow};
-use tracing::{info, warn, error, instrument};
+use anyhow::{anyhow, Context, Result};
+use tracing::{error, info, instrument, warn};
 
-mod config;
-mod scanner;
 mod attacker;
+mod config;
 mod monitor;
+mod scanner;
 
-use config::Config;
-use scanner::TargetScanner;
 use attacker::AttackExecutor;
+use config::Config;
 use monitor::OrderbookMonitor;
+use scanner::TargetScanner;
 
 pub struct OrderAttacker {
     config: Config,
@@ -64,9 +64,9 @@ impl OrderAttacker {
         self.running = true;
         warn!("⚠️ Order Attacker starting on TESTNET only ⚠️");
 
-        let mut interval = tokio::time::interval(
-            tokio::time::Duration::from_secs(self.config.strategy.cooldown_seconds)
-        );
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
+            self.config.strategy.cooldown_seconds,
+        ));
 
         while self.running {
             interval.tick().await;
@@ -127,7 +127,7 @@ impl OrderAttacker {
     async fn trade_monopoly(&self, _market: &str) -> Result<()> {
         // TODO: 挂出垄断价差订单
         // 在流动性真空时挂出大幅价差
-        
+
         Ok(())
     }
 
@@ -142,7 +142,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("order_attack=info".parse()?)
+                .add_directive("order_attack=info".parse()?),
         )
         .json()
         .init();
@@ -151,12 +151,11 @@ async fn main() -> Result<()> {
     let config_path = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "config/order-attack.toml".to_string());
-    
-    let config = Config::load(&config_path)
-        .context("Failed to load config")?;
+
+    let config = Config::load(&config_path).context("Failed to load config")?;
 
     let mut attacker = OrderAttacker::new(config);
-    
+
     // 处理信号
     tokio::spawn(async move {
         tokio::signal::ctrl_c().await.unwrap();
