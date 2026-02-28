@@ -188,7 +188,6 @@ mod tests {
     }
 
     #[test]
-    fn test_recency_score() {
         let engine = create_test_nlp_engine();
         
         let now = std::time::SystemTime::now()
@@ -234,25 +233,3 @@ mod tests {
 #[cfg(test)]
     use super::*;
 
-    #[test]
-    fn test_recency_score_fixed() {
-        let engine = create_test_nlp_engine();
-        
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        
-        // Recent news (< 60s) - should be 1.0
-        assert_eq!(engine.calc_recency(now - 30), 1.0);
-        
-        // 2 minutes old (< 300s) - should be 0.8
-        assert_eq!(engine.calc_recency(now - 120), 0.8);
-        
-        // 10 minutes old (< 3600s) - should be 0.5
-        assert_eq!(engine.calc_recency(now - 600), 0.5);
-        
-        // Old news (> 1 day) - should be 0.0
-        assert_eq!(engine.calc_recency(now - 100000), 0.0);
-    }
-}

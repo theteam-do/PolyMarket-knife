@@ -84,3 +84,7 @@ debug = true
 [profile.bench]
 opt-level = 3
 debug = false
+
+# 测试依赖
+[workspace.dependencies.mockall]
+version = "0.13"

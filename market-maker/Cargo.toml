@@ -21,3 +21,15 @@ config.workspace = true
 polymarket-client-sdk = { workspace = true, features = ["clob", "ws", "tracing"] }
 uuid.workspace = true
 alloy = { workspace = true, features = ["signer-local"] }
+
+[dev-dependencies]
+mockall = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }
+
+[[test]]
+name = "integration_test"
+path = "../tests/integration_test.rs"
+
+[[test]]
+name = "e2e_test"
+path = "../tests/e2e_test.rs"
