@@ -36,3 +36,8 @@ logs/
 .env.testnet
 *.testnet.toml
 testnet-*.log
+
+# Node.js
+node_modules/
+package.json
+package-lock.json
