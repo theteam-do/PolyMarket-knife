@@ -32,7 +32,7 @@ pub struct OrderAttacker {
 impl OrderAttacker {
     pub fn new(config: Config) -> Self {
         Self {
-            scanner: TargetScanner::new(&config.strategy),
+            scanner: TargetScanner::new(&config.strategy, &config.api),
             attacker: AttackExecutor::new(&config),
             monitor: OrderbookMonitor::new(&config),
             attacks_today: 0,
@@ -92,7 +92,12 @@ impl OrderAttacker {
 
         // 每次只攻击一个目标
         if let Some(target) = targets.first() {
-            info!("🎯 Target identified: {:?}", target);
+            info!(
+                "🎯 Target identified: market={} liquidity_usd={:.2} has_prices={}",
+                target.market,
+                target.liquidity_usd,
+                target.has_prices
+            );
 
             // 2. 执行攻击
             match self.attacker.execute(target).await {

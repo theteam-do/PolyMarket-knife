@@ -7,6 +7,10 @@ pub struct Config {
     pub polygon: PolygonConfig,
     pub clob: ClobConfig,
     pub strategy: StrategyConfig,
+    #[serde(default)]
+    pub api: ApiConfig,
+    #[serde(default)]
+    pub monitor: MonitorConfig,
     pub warning: WarningConfig,
 }
 
@@ -20,6 +24,26 @@ pub struct PolygonConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct ClobConfig {
     pub host: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct ApiConfig {
+    /// Gamma 市场列表 API
+    pub gamma_markets_url: String,
+    /// CLOB 订单簿路径
+    pub orderbook_path: String,
+    /// HTTP 请求超时（毫秒）
+    pub http_timeout_ms: u64,
+}
+
+impl Default for ApiConfig {
+    fn default() -> Self {
+        Self {
+            gamma_markets_url: "https://gamma-api.polymarket.com/markets".to_string(),
+            orderbook_path: "/book".to_string(),
+            http_timeout_ms: 10_000,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -44,6 +68,29 @@ pub struct StrategyConfig {
 
     /// 攻击间隔 (秒)
     pub cooldown_seconds: u64,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct MonitorConfig {
+    /// 轮询清空超时（秒）
+    pub clearing_timeout_seconds: u64,
+    /// 轮询间隔（毫秒）
+    pub poll_interval_ms: u64,
+    /// 判定“接近清空”的最大档位（每边）
+    pub max_levels_per_side: usize,
+    /// 判定“接近清空”的最大累计深度（每边）
+    pub max_depth_per_side: f64,
+}
+
+impl Default for MonitorConfig {
+    fn default() -> Self {
+        Self {
+            clearing_timeout_seconds: 30,
+            poll_interval_ms: 500,
+            max_levels_per_side: 2,
+            max_depth_per_side: 100.0,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]

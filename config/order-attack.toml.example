@@ -20,6 +20,24 @@ exclude_addresses = []              # 排除地址
 max_attacks_per_day = 10
 cooldown_seconds = 300              # 攻击间隔 5 分钟
 
+[api]
+# 市场扫描 API
+gamma_markets_url = "https://gamma-api.polymarket.com/markets"
+# 订单簿路径（会拼接到 [clob].host 后）
+orderbook_path = "/book"
+# HTTP 超时（毫秒）
+http_timeout_ms = 10000
+
+[monitor]
+# 等待订单簿清空超时（秒）
+clearing_timeout_seconds = 30
+# 轮询间隔（毫秒）
+poll_interval_ms = 500
+# 判定“接近清空”的最大档位（每边）
+max_levels_per_side = 2
+# 判定“接近清空”的最大累计深度（每边）
+max_depth_per_side = 100.0
+
 [warning]
 # ⚠️ 必须设置为 true 才能运行
 testnet_only = true
