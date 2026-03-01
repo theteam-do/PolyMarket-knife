@@ -29,7 +29,6 @@ pub enum ArbOpportunity {
 pub struct Detector {
     min_profit: Decimal,
     max_position: Decimal,
-    scan_interval_ms: u64,
 }
 
 impl Detector {
@@ -37,7 +36,6 @@ impl Detector {
         Self {
             min_profit: config.min_profit(),
             max_position: config.max_position(),
-            scan_interval_ms: config.scan_interval_ms(),
         }
     }
 
@@ -82,10 +80,6 @@ impl Detector {
         }
         None
     }
-
-    pub fn scan_interval_ms(&self) -> u64 {
-        self.scan_interval_ms
-    }
 }
 
 impl std::fmt::Display for ArbOpportunity {
@@ -129,7 +123,6 @@ mod tests {
         let config = StrategyConfig {
             min_profit_usd: 0.02,
             max_position_per_trade: 1000.0,
-            scan_interval_ms: 50,
             gas_price_gwei: 50,
             include_all: true,
             exclude_market_ids: vec![],

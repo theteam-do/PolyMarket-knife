@@ -18,3 +18,5 @@ rust_decimal_macros.workspace = true
 polymarket-client-sdk.workspace = true
 config.workspace = true
 reqwest.workspace = true
+ethers.workspace = true
+futures-util.workspace = true

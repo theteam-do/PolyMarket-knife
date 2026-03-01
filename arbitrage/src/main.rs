@@ -1,18 +1,22 @@
 //! Arbitrage - 简化工作版本
 
 use anyhow::{Context, Result};
-use tracing::info;
+use tracing::{info, warn};
 
 mod config;
 mod detector;
 mod executor;
 mod scanner;
+mod state;
 
 use config::Config;
 use detector::Detector;
 use executor::Executor;
 use scanner::Scanner;
-use tokio::time::{sleep, Duration};
+use state::MarketState;
+use poly_client::ws_client::{WsClient, WsConfig, ChannelType, WsMessage};
+use tokio::sync::mpsc;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -28,7 +32,7 @@ async fn main() -> Result<()> {
     let config_path = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "config/arbitrage.toml".to_string());
-
+    
     let config = Config::load(&config_path).context("Failed to load config")?;
     info!(
         "Config loaded: rpc_url={} gas_price_gwei={} mode={:?} environment={:?} live_ack={}",
@@ -39,21 +43,61 @@ async fn main() -> Result<()> {
         config.execution.live_acknowledged
     );
 
+    let ws_market_url = config.clob.ws_market_url.clone().unwrap_or_else(|| "wss://ws-subscriptions-clob.polymarket.com/ws/market".to_string());
+    let ws_user_url = config.clob.ws_user_url.clone().unwrap_or_else(|| "wss://ws-subscriptions-clob.polymarket.com/ws/user".to_string());
+
+    let ws_config = WsConfig {
+        market_url: ws_market_url,
+        user_url: ws_user_url,
+        ..Default::default()
+    };
+    let ws_client = WsClient::new(ws_config);
+
     let scanner = Scanner::new(&config);
-    let detector = Detector::new(&config.strategy);
-    let executor = Executor::new(&config);
+    let detector = Arc::new(Detector::new(&config.strategy));
+    let executor = Arc::new(Executor::new(&config));
 
-    let markets = scanner.scan().await?;
-    if let Some(opportunity) = detector.detect(&markets) {
-        let expected_profit = executor.execute(&opportunity).await?;
-        info!("Opportunity executed: {} expected_profit={}", opportunity, expected_profit);
-    } else {
-        info!("No arbitrage opportunity found");
+    info!("Fetching initial market state via HTTP...");
+    let initial_markets = scanner.scan().await?;
+    let mut state = MarketState::new(initial_markets);
+    
+    let asset_ids = state.get_all_assets();
+    info!("Initial market state loaded. Tracking {} assets. Subscribing to Market WS...", asset_ids.len());
+
+    let (tx, mut rx) = mpsc::channel(1000);
+    
+    let ws_client = Arc::new(ws_client);
+    let ws_client_clone = Arc::clone(&ws_client);
+    
+    tokio::spawn(async move {
+        if let Err(e) = ws_client_clone.stream_with_reconnect(ChannelType::Market, asset_ids, tx).await {
+            warn!("WebSocket stream error: {}", e);
+        }
+    });
+
+    info!("Arbitrage initialized and waiting for real-time WS events...");
+
+    while let Some(msg) = rx.recv().await {
+        match msg {
+            WsMessage::MarketEvent { event_type, payload } => {
+                if state.update_from_ws_payload(&event_type, &payload) {
+                    let markets = state.get_all_markets();
+                    if let Some(opportunity) = detector.detect(&markets) {
+                        info!("Opportunity detected via WS: {}", opportunity);
+                        match executor.execute(&opportunity).await {
+                            Ok(expected_profit) => {
+                                info!("Opportunity executed: expected_profit={}", expected_profit);
+                            }
+                            Err(e) => {
+                                warn!("Failed to execute opportunity: {}", e);
+                            }
+                        }
+                    }
+                }
+            },
+            _ => {} // Ignore generic or raw messages for now
+        }
     }
-
-    sleep(Duration::from_millis(detector.scan_interval_ms())).await;
-
-    info!("Arbitrage initialized");
 
     Ok(())
 }

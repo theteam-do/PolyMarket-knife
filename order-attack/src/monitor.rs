@@ -158,7 +158,9 @@ mod tests {
                 private_key: String::new(),
             },
             clob: ClobConfig {
-                host: "https://clob.example.com".to_string(),
+                host: "https://clob.polymarket.com".to_string(),
+                ws_market_url: None,
+                ws_user_url: None,
             },
             strategy: StrategyConfig {
                 attack_gas_limit: 50_000,

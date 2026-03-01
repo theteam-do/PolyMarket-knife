@@ -1,66 +1,132 @@
-//! Follow Trade - 跟单策略完整实现
-
 use anyhow::{Context, Result};
+use rust_decimal::prelude::ToPrimitive;
+use std::sync::Arc;
+use tokio::signal;
+use tokio::sync::{mpsc, Mutex};
 use tracing::{info, warn};
 
-mod config;
-mod copier;
-mod monitor;
-mod risk;
+pub mod config;
+pub mod copier;
+pub mod monitor;
 
-use config::Config;
-use copier::TradeCopier;
-use monitor::ChainMonitor;
-use risk::RiskManager;
+use crate::config::Config;
+use crate::copier::TradeCopier;
+use crate::monitor::ChainMonitor;
+
+#[derive(Default)]
+struct RiskManager {
+    daily_pnl: f64,
+    total_exposure: f64,
+}
+
+impl RiskManager {
+    fn can_trade(&self, config: &Config) -> bool {
+        self.daily_pnl >= -config.strategy.max_daily_loss
+            && self.total_exposure <= config.strategy.max_position_per_market
+    }
+
+    fn update_exposure(&mut self, notional: f64) {
+        self.total_exposure += notional;
+    }
+
+    fn update_pnl(&mut self, pnl: f64) {
+        self.daily_pnl += pnl;
+    }
+
+    fn total_position_value(&self) -> f64 {
+        self.total_exposure
+    }
+
+    fn reset_daily(&mut self) {
+        self.daily_pnl = 0.0;
+    }
+}
 
 pub struct Follower {
     config: Config,
-    monitor: ChainMonitor,
     copier: TradeCopier,
-    risk_manager: RiskManager,
+    risk_manager: Arc<Mutex<RiskManager>>,
     running: bool,
 }
 
 impl Follower {
     pub fn new(config: Config) -> Result<Self> {
-        let monitor = ChainMonitor::new(&config);
         let copier = TradeCopier::new(&config);
-        let risk_manager = RiskManager::new(&config.strategy);
 
         Ok(Self {
             config,
-            monitor,
             copier,
-            risk_manager,
+            risk_manager: Arc::new(Mutex::new(RiskManager::default())),
             running: false,
         })
     }
 
     pub async fn run(&mut self) -> Result<()> {
         self.running = true;
-        info!("Follow Trader starting...");
-        info!(
-            "Monitoring {} smart addresses",
-            self.config.strategy.smart_addresses.len()
-        );
+        info!("Starting Follow Trader...");
 
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(100));
+        let (tx, mut rx) = mpsc::channel(100);
 
-        let mut trades_copied = 0u32;
-        let mut total_pnl = rust_decimal::Decimal::ZERO;
+        // 启动独立任务监控链上日志
+        let monitor_clone = ChainMonitor::new(&self.config);
+        tokio::spawn(async move {
+            if let Err(e) = monitor_clone.stream_trades(tx).await {
+                warn!("Chain monitor stopped with error: {}", e);
+            }
+        });
 
-        while self.running {
-            interval.tick().await;
+        let mut trades_copied = 0;
+        let mut total_pnl = 0.0;
 
-            match self.tick().await {
-                Ok(Some(profit)) => {
-                    trades_copied += 1;
-                    total_pnl += profit;
-                    info!("Copied {} trades, total PnL: ${}", trades_copied, total_pnl);
+        loop {
+            tokio::select! {
+                _ = signal::ctrl_c() => {
+                    info!("Ctrl-C received, shutting down gracefully...");
+                    self.stop().await;
+                    break;
                 }
-                Ok(None) => {}
-                Err(e) => {
-                    warn!("Tick error: {}", e);
+                trade_event = rx.recv() => {
+                    match trade_event {
+                        Some(trade) => {
+                            let mut risk = self.risk_manager.lock().await;
+                            
+                            if !risk.can_trade(&self.config) {
+                                warn!("Risk limits exceeded, skipping trade from {}", trade.from);
+                                continue;
+                            }
+
+                            info!("Processing smart trade event: {:?}", trade);
+
+                            match self.copier.copy(&trade).await {
+                                Ok(profit_dec) => {
+                                    let profit = profit_dec.to_f64().unwrap_or(0.0);
+                                    let size_f64 = trade.size_usd.to_f64().unwrap_or(0.0);
+                                    let copied_notional = size_f64 * self.config.strategy.copy_ratio;
+                                    
+                                    risk.update_exposure(copied_notional);
+                                    risk.update_pnl(profit);
+                                    
+                                    info!(
+                                        "Risk updated: market={} copied_notional=${:.2} total_position=${:.2}",
+                                        trade.market_id,
+                                        copied_notional,
+                                        risk.total_position_value()
+                                    );
+                                    
+                                    trades_copied += 1;
+                                    total_pnl += profit;
+                                    info!("Copied {} trades, total PnL: ${}", trades_copied, total_pnl);
+                                }
+                                Err(e) => {
+                                    warn!("Failed to copy trade: {}", e);
+                                }
+                            }
+                        }
+                        None => {
+                            warn!("Trade event channel closed");
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -72,45 +138,10 @@ impl Follower {
         Ok(())
     }
 
-    async fn tick(&mut self) -> Result<Option<rust_decimal::Decimal>> {
-        // 1. 获取聪明钱交易
-        let trades = self.monitor.fetch_trades().await?;
-
-        for trade in trades {
-            // 2. 风控检查
-            if !self.risk_manager.can_trade(&trade) {
-                warn!("Risk check failed for trade");
-                continue;
-            }
-
-            // 3. 执行跟单
-            match self.copier.copy(&trade).await {
-                Ok(profit) => {
-                    let copied_notional = trade.size_usd * self.config.strategy.copy_ratio;
-                    self.risk_manager
-                        .update_position(&trade.market_id, copied_notional);
-                    self.risk_manager
-                        .update_pnl(profit.to_string().parse::<f64>().unwrap_or(0.0));
-                    info!(
-                        "Risk updated: market={} copied_notional=${:.2} total_position=${:.2}",
-                        trade.market_id,
-                        copied_notional,
-                        self.risk_manager.total_position_value()
-                    );
-                    return Ok(Some(profit));
-                }
-                Err(e) => {
-                    warn!("Failed to copy trade: {}", e);
-                }
-            }
-        }
-
-        Ok(None)
-    }
-
-    pub fn stop(&mut self) {
+    pub async fn stop(&mut self) {
         self.running = false;
-        self.risk_manager.reset_daily();
+        let mut risk = self.risk_manager.lock().await;
+        risk.reset_daily();
     }
 }
 
@@ -127,7 +158,7 @@ async fn main() -> Result<()> {
     let config_path = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "config/follow-trade.toml".to_string());
-
+    
     let config = Config::load(&config_path).context("Failed to load config")?;
     info!(
         "Config loaded: rpc_url={} mode={:?} environment={:?} live_ack={} fallback_to_paper={}",
@@ -139,11 +170,5 @@ async fn main() -> Result<()> {
     );
 
     let mut follower = Follower::new(config)?;
-
-    tokio::spawn(async move {
-        tokio::signal::ctrl_c().await.unwrap();
-        info!("Shutting down...");
-    });
-
     follower.run().await
 }

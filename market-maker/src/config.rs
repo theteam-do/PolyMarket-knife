@@ -25,6 +25,8 @@ pub struct PolygonConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct ClobConfig {
     pub host: String,
+    pub ws_market_url: Option<String>,
+    pub ws_user_url: Option<String>,
     pub api_key: Option<String>,
     pub api_secret: Option<String>,
 }
@@ -82,6 +84,8 @@ impl Config {
             clob: ClobConfig {
                 host: std::env::var("CLOB_HOST")
                     .unwrap_or_else(|_| "https://clob.polymarket.com".to_string()),
+                ws_market_url: std::env::var("CLOB_WS_MARKET_URL").ok(),
+                ws_user_url: std::env::var("CLOB_WS_USER_URL").ok(),
                 api_key: std::env::var("CLOB_API_KEY").ok(),
                 api_secret: std::env::var("CLOB_API_SECRET").ok(),
             },

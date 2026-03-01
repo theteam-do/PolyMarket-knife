@@ -32,7 +32,7 @@ impl TradeCopier {
     #[instrument(skip(self), fields(trade = ?trade))]
     pub async fn copy(&self, trade: &TradeEvent) -> Result<Decimal> {
         let size = self.calculate_copy_size(trade.size_usd);
-
+        
         info!(
             "Copying trade: market={} side={:?} original_size=${} copy_size=${}",
             trade.market, trade.side, trade.size_usd, size
@@ -69,7 +69,7 @@ impl TradeCopier {
                 crate::monitor::Side::Sell => "SELL",
             },
             size,
-            price: Decimal::from_f64_retain(trade.price).unwrap_or(dec!(0.5)),
+            price: trade.price,
             source_wallet: &trade.from,
             source_ts: trade.timestamp,
         };
@@ -96,19 +96,17 @@ impl TradeCopier {
     async fn simulate_execution(&self, _trade: &TradeEvent, size: Decimal) -> Result<Decimal> {
         // 模拟跟单利润
         let profit = size * dec!(0.05); // 5% 模拟利润
-        
         info!("Simulated copy: size={}, profit={}", size, profit);
-        
         Ok(profit)
     }
 
-    fn calculate_copy_size(&self, original_size: f64) -> Decimal {
-        let copy_ratio = Decimal::from_f64_retain(self.config.strategy.copy_ratio).unwrap();
-        let size = Decimal::from_f64_retain(original_size).unwrap() * copy_ratio;
-
-        let min_size = Decimal::from_f64_retain(self.config.strategy.min_trade_size_usd).unwrap();
-        let max_size = Decimal::from_f64_retain(self.config.strategy.max_trade_size_usd).unwrap();
-
+    fn calculate_copy_size(&self, original_size: Decimal) -> Decimal {
+        let copy_ratio = Decimal::from_f64_retain(self.config.strategy.copy_ratio).unwrap_or(dec!(1.0));
+        let size = original_size * copy_ratio;
+        
+        let min_size = Decimal::from_f64_retain(self.config.strategy.min_trade_size_usd).unwrap_or(dec!(5.0));
+        let max_size = Decimal::from_f64_retain(self.config.strategy.max_trade_size_usd).unwrap_or(dec!(1000.0));
+        
         size.clamp(min_size, max_size)
     }
 }

@@ -1,11 +1,14 @@
 # Follow Trade 配置文件
 
 [polygon]
-rpc_url = "wss://polygon-rpc.com"
+rpc_url = "https://polygon-rpc.com"
+ws_rpc_url = "wss://polygon-rpc.com"
 private_key = "YOUR_PRIVATE_KEY_HERE"
 
 [clob]
 host = "https://clob.polymarket.com"
+ws_market_url = "wss://ws-subscriptions-clob.polymarket.com/ws/market"
+ws_user_url = "wss://ws-subscriptions-clob.polymarket.com/ws/user"
 api_key = ""
 api_secret = ""
 

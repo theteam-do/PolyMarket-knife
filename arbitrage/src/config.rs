@@ -25,6 +25,8 @@ pub struct PolygonConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct ClobConfig {
     pub host: String,
+    pub ws_market_url: Option<String>,
+    pub ws_user_url: Option<String>,
     pub api_key: Option<String>,
     pub api_secret: Option<String>,
 }
@@ -33,7 +35,6 @@ pub struct ClobConfig {
 pub struct StrategyConfig {
     pub min_profit_usd: f64,
     pub max_position_per_trade: f64,
-    pub scan_interval_ms: u64,
     pub gas_price_gwei: u64,
     pub include_all: bool,
     pub exclude_market_ids: Vec<String>,
@@ -102,10 +103,6 @@ impl StrategyConfig {
 
     pub fn max_position(&self) -> Decimal {
         Decimal::from_f64_retain(self.max_position_per_trade).unwrap_or(dec!(1000))
-    }
-
-    pub fn scan_interval_ms(&self) -> u64 {
-        self.scan_interval_ms
     }
 }
 

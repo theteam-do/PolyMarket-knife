@@ -3,3 +3,4 @@
 pub mod types;
 
 pub use types::*;
+pub mod ws_client;
