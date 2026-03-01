@@ -1,5 +1,14 @@
 # Follow Trade - 跟单策略
 
+## 🚦 当前实现状态（2026-03）
+
+- 当前为**跟单框架 + HTTP 执行**版本。
+- 数据源当前主要来自 API 拉取，不是完整链上事件订阅。
+- 支持 `execution.mode = "paper|live"`：
+  - `paper`：仅模拟收益
+  - `live`：尝试真实下单
+- 默认启用安全门禁：`require_explicit_live_ack = true` 且 `live_acknowledged = false`。
+
 ## 🎯 策略核心
 
 监控 Polymarket 上的"聪明钱"地址，自动复制它们的交易。
@@ -21,8 +30,8 @@
 
 | 指标 | 目标 | 说明 |
 |------|------|------|
-| 监控延迟 | <100ms | 链上事件检测到本地处理 |
-| 跟单延迟 | <300ms | 检测到交易到执行完成 |
+| 监控延迟 | 视部署环境 | API 拉取到本地处理 |
+| 跟单延迟 | 视执行端点 | 检测到交易到执行完成 |
 | 滑点容忍 | <2% | 超过则放弃跟单 |
 
 ## 🔧 配置示例
@@ -32,6 +41,11 @@
 [polygon]
 rpc_url = "wss://polygon-rpc.com"
 private_key = "0x..."
+
+[clob]
+host = "https://clob.polymarket.com"
+api_key = ""
+api_secret = ""
 
 [strategy]
 # 监控的聪明钱地址
@@ -50,14 +64,21 @@ slippage_tolerance = 0.02    # 滑点容忍度
 max_position_per_market = 10000
 max_daily_loss = 1000
 blacklist = []               # 黑名单市场
+
+[execution]
+mode = "paper"                  # paper 或 live
+environment = "testnet"         # testnet 或 mainnet
+require_explicit_live_ack = true
+live_acknowledged = false
+live_failure_fallback_to_paper = false
 ```
 
 ## 🏗️ 架构设计
 
 ```
 ┌─────────────────────────────────────────────────┐
-│              Chain Monitor                       │
-│         (监听智能合约事件)                        │
+│              Data Monitor                        │
+│         (当前以 API 拉取为主)                      │
 └────────────────┬────────────────────────────────┘
                  │
                  ▼

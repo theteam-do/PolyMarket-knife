@@ -31,8 +31,12 @@ async fn main() -> Result<()> {
 
     let config = Config::load(&config_path).context("Failed to load config")?;
     info!(
-        "Config loaded: rpc_url={}, gas_price_gwei={}",
-        config.polygon.rpc_url, config.strategy.gas_price_gwei
+        "Config loaded: rpc_url={} gas_price_gwei={} mode={:?} environment={:?} live_ack={}",
+        config.polygon.rpc_url,
+        config.strategy.gas_price_gwei,
+        config.execution.mode,
+        config.execution.environment,
+        config.execution.live_acknowledged
     );
 
     let scanner = Scanner::new(&config);

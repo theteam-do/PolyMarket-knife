@@ -52,12 +52,30 @@
 
 | 程序 | 延迟要求 | 线程模型 | 数据源 | 复杂度 |
 |------|----------|----------|--------|--------|
-| market-maker | <100ms | 单线程 | Poly WS | 中 |
-| arbitrage | <50ms | 单线程 | Poly API | 低 |
-| follow-trade | <500ms | 单线程 | Chain Events | 低 |
-| volatility-hunter | <20ms | 多线程 | Binance WS + Poly WS | 高 |
-| info-edge | <1s | 多线程 | News APIs | 中 |
+| market-maker | 目标 <100ms | 单线程 | Poly WS | 中 |
+| arbitrage | 目标 <50ms | 单线程 | Poly API | 低 |
+| follow-trade | 目标 <500ms | 单线程 | API 拉取为主 | 低 |
+| volatility-hunter | 目标 <20ms | 单线程事件循环 | Binance WS + Poly API | 高 |
+| info-edge | 目标 <1s | 单线程事件循环 | News APIs | 中 |
 | order-attack | <100ms | 单线程 | Poly API | 高 |
+
+## 运行安全门禁（Execution Guardrails）
+
+以下策略已统一支持执行门禁配置：
+
+- `arbitrage`
+- `follow-trade`
+- `volatility-hunter`
+
+配置字段：
+
+- `execution.mode = "paper|live"`
+- `execution.environment = "testnet|mainnet"`
+- `require_explicit_live_ack`
+- `live_acknowledged`
+- `live_failure_fallback_to_paper`
+
+默认推荐：`paper + testnet + live_acknowledged=false`。
 
 ## 依赖关系
 

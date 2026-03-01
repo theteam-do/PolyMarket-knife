@@ -2,22 +2,36 @@
 
 **日期**: 2026-03-01  
 **分支**: `feature/migrate-to-official-sdk`  
-**状态**: ✅ 完成
+**状态**: ⚠️ 部分完成（仅 info-edge 完整，其他策略为框架/简化实现）
 
 ---
 
 ## 📊 实现总结
 
 ### ✅ 所有 6 个策略编译通过
+### ⚠️ 功能完整度存在差异（详见 `docs/CODE_REVIEW_FINDINGS.md`）
 
 | 策略 | 二进制大小 | 状态 | SDK 集成度 |
 |------|-----------|------|-----------|
 | **info-edge** | 2.0M | ✅ 完整 | 100% |
-| **market-maker** | 2.0M | ✅ 框架 | 80% |
-| **arbitrage** | 311K | ✅ 简化 | 50% |
-| **follow-trade** | 311K | ✅ 简化 | 50% |
-| **volatility-hunter** | 311K | ✅ 简化 | 50% |
-| **order-attack** | 2.0M | ✅ 简化 | 50% |
+| **market-maker** | 2.0M | ⚠️ 框架 | 80% |
+| **arbitrage** | 311K | ⚠️ 简化 | 50% |
+| **follow-trade** | 311K | ⚠️ 简化 | 50% |
+| **volatility-hunter** | 311K | ⚠️ 简化 | 50% |
+| **order-attack** | 2.0M | ⚠️ 模拟/受限 | 30% |
+
+---
+
+## 🔐 运行安全门禁（新增）
+
+`arbitrage / follow-trade / volatility-hunter` 已统一支持：
+
+- `execution.mode = "paper|live"`
+- `execution.environment = "testnet|mainnet"`
+- `require_explicit_live_ack` + `live_acknowledged`
+- `live_failure_fallback_to_paper`
+
+默认值为 `paper + testnet + live_acknowledged=false`，未确认时禁止 live 启动。
 
 ---
 

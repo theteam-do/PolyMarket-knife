@@ -8,6 +8,7 @@ use serde::Serialize;
 use tracing::{info, instrument, warn};
 
 use crate::config::Config;
+use crate::config::ExecutionMode;
 use crate::signal::Signal;
 
 /// 订单执行器
@@ -41,16 +42,21 @@ impl Executor {
             position
         );
 
-        // 尝试实盘下单，失败则降级到模拟
+        if self.config.execution.mode == ExecutionMode::Paper {
+            return self.simulate_execution(signal, position).await;
+        }
+
+        // 尝试实盘下单（是否降级由配置控制）
         match self.execute_live(signal, position).await {
-            Ok(profit) => return Ok(profit),
+            Ok(profit) => Ok(profit),
             Err(e) => {
-                warn!("Live execution failed: {}. Falling back to simulation.", e);
+                if self.config.execution.live_failure_fallback_to_paper {
+                    warn!("Live execution failed: {}. Falling back to simulation.", e);
+                    return self.simulate_execution(signal, position).await;
+                }
+                anyhow::bail!("live execution failed: {}", e)
             }
         }
-        
-        // 模拟执行（用于测试/降级）
-        self.simulate_execution(signal, position).await
     }
 
     async fn execute_live(&self, signal: &Signal, position: Decimal) -> Result<Decimal> {

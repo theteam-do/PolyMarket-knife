@@ -4,6 +4,11 @@
 rpc_url = "wss://polygon-rpc.com"
 private_key = "YOUR_PRIVATE_KEY_HERE"
 
+[clob]
+host = "https://clob.polymarket.com"
+api_key = ""
+api_secret = ""
+
 [strategy]
 # 监控的聪明钱地址 (示例)
 smart_addresses = [
@@ -21,3 +26,14 @@ slippage_tolerance = 0.02     # 滑点容忍度 (2%)
 max_position_per_market = 10000
 max_daily_loss = 1000
 blacklist = []                # 黑名单市场
+
+[execution]
+# paper: 仅模拟执行；live: 尝试真实执行
+mode = "paper"
+# testnet 或 mainnet
+environment = "testnet"
+# 启用 live 时必须显式确认
+require_explicit_live_ack = true
+live_acknowledged = false
+# live 失败后是否回退到 paper
+live_failure_fallback_to_paper = false

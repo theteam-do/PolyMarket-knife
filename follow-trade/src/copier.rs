@@ -8,6 +8,7 @@ use serde::Serialize;
 use tracing::{info, instrument, warn};
 
 use crate::config::Config;
+use crate::config::ExecutionMode;
 use crate::monitor::TradeEvent;
 
 pub struct TradeCopier {
@@ -37,19 +38,24 @@ impl TradeCopier {
             trade.market, trade.side, trade.size_usd, size
         );
 
-        // 尝试实盘下单（失败会降级为模拟）
+        if self.config.execution.mode == ExecutionMode::Paper {
+            return self.simulate_execution(trade, size).await;
+        }
+
+        // 尝试实盘下单（是否降级由配置控制）
         match self.execute_live(trade, size).await {
             Ok(order_id) => {
                 info!("Order placed successfully: {}", order_id);
                 return Ok(size * dec!(0.1));
             }
             Err(e) => {
-                warn!("Live execution failed: {}. Falling back to simulation.", e);
+                if self.config.execution.live_failure_fallback_to_paper {
+                    warn!("Live execution failed: {}. Falling back to simulation.", e);
+                    return self.simulate_execution(trade, size).await;
+                }
+                anyhow::bail!("live copy execution failed: {}", e);
             }
         }
-        
-        // 模拟执行（用于测试/降级）
-        self.simulate_execution(trade, size).await
     }
 
     /// 使用 CLOB HTTP 接口执行跟单

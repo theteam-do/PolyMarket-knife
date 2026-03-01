@@ -129,6 +129,14 @@ async fn main() -> Result<()> {
         .unwrap_or_else(|| "config/follow-trade.toml".to_string());
 
     let config = Config::load(&config_path).context("Failed to load config")?;
+    info!(
+        "Config loaded: rpc_url={} mode={:?} environment={:?} live_ack={} fallback_to_paper={}",
+        config.polygon.rpc_url,
+        config.execution.mode,
+        config.execution.environment,
+        config.execution.live_acknowledged,
+        config.execution.live_failure_fallback_to_paper
+    );
 
     let mut follower = Follower::new(config)?;
 

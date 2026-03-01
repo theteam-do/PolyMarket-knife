@@ -1,5 +1,14 @@
 # Volatility Hunter - 超短期波动狩猎
 
+## 🚦 当前实现状态（2026-03）
+
+- 当前为**信号生成 + 执行框架**版本。
+- 支持 `execution.mode = "paper|live"`：
+  - `paper`：模拟执行
+  - `live`：尝试真实下单
+- 默认启用安全门禁：`require_explicit_live_ack = true` 且 `live_acknowledged = false`。
+- 延迟目标为设计目标，当前版本仅具备基础日志可观测性。
+
 ## 🎯 策略核心
 
 利用**毫秒级数据源**（币安 WebSocket）比 Polymarket 订单簿更快，捕捉加密货币波动瞬间的定价延迟。
@@ -22,10 +31,10 @@
 
 | 指标 | 目标 | 说明 |
 |------|------|------|
-| 数据源延迟 | <2ms | 币安 WS 到本地处理 |
-| 决策延迟 | <5ms | 信号生成到下单决策 |
-| 下单延迟 | <10ms | 决策到订单发出 |
-| 总延迟 | <20ms | 端到端延迟 |
+| 数据源延迟 | 目标值 | 币安 WS 到本地处理 |
+| 决策延迟 | 目标值 | 信号生成到下单决策 |
+| 下单延迟 | 目标值 | 决策到订单发出 |
+| 总延迟 | 目标值 | 端到端延迟 |
 
 ## 🔧 配置示例
 
@@ -34,6 +43,11 @@
 [polygon]
 rpc_url = "wss://polygon-rpc.com"
 private_key = "0x..."
+
+[clob]
+host = "https://clob.polymarket.com"
+api_key = ""
+api_secret = ""
 
 [binance]
 ws_url = "wss://stream.binance.com:9443/ws"
@@ -57,6 +71,13 @@ confidence_high = 0.8            # 高置信度阈值
 max_loss_per_trade = 100
 max_daily_loss = 500
 stop_loss_pct = 0.1              # 10% 止损
+
+[execution]
+mode = "paper"                  # paper 或 live
+environment = "testnet"         # testnet 或 mainnet
+require_explicit_live_ack = true
+live_acknowledged = false
+live_failure_fallback_to_paper = false
 ```
 
 ## 🏗️ 架构设计

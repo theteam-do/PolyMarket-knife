@@ -1,5 +1,13 @@
 # Arbitrage - 套利策略
 
+## 🚦 当前实现状态（2026-03）
+
+- 当前为**框架 + 执行意图提交**版本，不包含完整链上 `mint/redeem` 交互。
+- 支持 `execution.mode = "paper|live"`：
+  - `paper`：仅模拟收益
+  - `live`：提交执行意图到配置的执行端点
+- 默认启用安全门禁：`require_explicit_live_ack = true` 且 `live_acknowledged = false`。
+
 ## 🎯 策略核心
 
 捕捉 Polymarket 内部的定价错误，无风险获利。
@@ -18,8 +26,8 @@
 
 | 指标 | 目标 | 说明 |
 |------|------|------|
-| 扫描延迟 | <10ms | 全市场扫描周期 |
-| 执行延迟 | <30ms | 发现机会到下单 |
+| 扫描延迟 | 视部署环境 | 全市场扫描周期 |
+| 执行延迟 | 视执行端点 | 发现机会到提交执行意图 |
 | 最小利润 | $0.02 | 扣除 Gas 后的净利润 |
 
 ## 🔧 配置示例
@@ -30,16 +38,25 @@
 rpc_url = "wss://polygon-rpc.com"
 private_key = "0x..."
 
+[clob]
+host = "https://clob.polymarket.com"
+api_key = ""
+api_secret = ""
+
 [strategy]
 min_profit_usd = 0.02
 max_position_per_trade = 1000
 scan_interval_ms = 50
 gas_price_gwei = 50
-
-[markets]
-# 监控的市场列表
 include_all = true
-exclude = ["0x...", "0x..."]
+exclude_market_ids = ["0x...", "0x..."]
+
+[execution]
+mode = "paper"                  # paper 或 live
+environment = "testnet"         # testnet 或 mainnet
+require_explicit_live_ack = true
+live_acknowledged = false
+live_failure_fallback_to_paper = false
 ```
 
 ## 🏗️ 架构设计
@@ -72,7 +89,7 @@ exclude = ["0x...", "0x..."]
 ```rust
 // 1. 扫描所有市场
 fn scan_markets(&self) -> Vec<MarketPrice> {
-    self.markets.par_iter()
+    self.markets.iter()
         .filter_map(|m| self.fetch_price(m))
         .collect()
 }
@@ -105,10 +122,8 @@ fn detect_arbitrage(&self, prices: &[MarketPrice]) -> Option<ArbOpportunity> {
 async fn execute(&self, opp: &ArbOpportunity) -> Result<()> {
     match opp {
         ArbOpportunity::BuyAndMint { market, .. } => {
-            self.buy_yes(market).await?;
-            self.buy_no(market).await?;
-            self.mint(market).await?;
-            self.redeem(market).await?;
+            // 当前实现提交执行意图，由执行端处理
+            self.submit_execution_intent(market).await?;
         }
         ArbOpportunity::RedeemAndSell { market, .. } => {
             // 反向操作

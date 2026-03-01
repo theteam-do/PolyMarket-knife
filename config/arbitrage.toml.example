@@ -4,10 +4,26 @@
 rpc_url = "wss://polygon-rpc.com"
 private_key = "YOUR_PRIVATE_KEY_HERE"
 
+[clob]
+host = "https://clob.polymarket.com"
+api_key = ""
+api_secret = ""
+
 [strategy]
 min_profit_usd = 0.02           # 最小利润 (扣除 Gas 后)
 max_position_per_trade = 1000   # 单笔最大仓位
 scan_interval_ms = 50           # 扫描间隔
 gas_price_gwei = 50             # Gas 价格
 include_all = true              # 包含所有市场
-exclude = []                    # 排除的市场
+exclude_market_ids = []         # 排除的市场
+
+[execution]
+# paper: 仅模拟执行；live: 尝试真实执行
+mode = "paper"
+# testnet 或 mainnet
+environment = "testnet"
+# 启用 live 时必须显式确认
+require_explicit_live_ack = true
+live_acknowledged = false
+# live 失败后是否回退到 paper
+live_failure_fallback_to_paper = false

@@ -8,6 +8,7 @@ use serde::Serialize;
 use tracing::{info, instrument, warn};
 
 use crate::config::Config;
+use crate::config::ExecutionMode;
 use crate::detector::ArbOpportunity;
 
 /// 套利执行器
@@ -29,8 +30,33 @@ impl Executor {
         }
     }
 
+    async fn execute_paper(&self, opp: &ArbOpportunity) -> Result<Decimal> {
+        let profit = match opp {
+            ArbOpportunity::BuyAndMint {
+                profit_per_share,
+                max_shares,
+                ..
+            }
+            | ArbOpportunity::RedeemAndSell {
+                profit_per_share,
+                max_shares,
+                ..
+            } => *profit_per_share * *max_shares,
+        };
+
+        info!(
+            "[PAPER] Arbitrage execution simulated: opportunity={} expected_profit={}",
+            opp, profit
+        );
+        Ok(profit)
+    }
+
     #[instrument(skip(self), fields(opp = %opp))]
     pub async fn execute(&self, opp: &ArbOpportunity) -> Result<Decimal> {
+        if self.config.execution.mode == ExecutionMode::Paper {
+            return self.execute_paper(opp).await;
+        }
+
         match opp {
             ArbOpportunity::BuyAndMint {
                 token_id_yes,
@@ -112,7 +138,14 @@ impl Executor {
         };
 
         if let Err(e) = self.submit_execution_intent(&payload).await {
-            warn!("Failed to submit buy-and-mint execution intent: {}", e);
+            if self.config.execution.live_failure_fallback_to_paper {
+                warn!(
+                    "Live submit failed, fallback to paper mode for buy-and-mint: {}",
+                    e
+                );
+                return Ok(expected_profit);
+            }
+            return Err(e);
         }
 
         info!("BuyAndMint executed: shares={}, cost={}, profit={}", shares, total_cost, expected_profit);
@@ -150,7 +183,14 @@ impl Executor {
         };
 
         if let Err(e) = self.submit_execution_intent(&payload).await {
-            warn!("Failed to submit redeem-and-sell execution intent: {}", e);
+            if self.config.execution.live_failure_fallback_to_paper {
+                warn!(
+                    "Live submit failed, fallback to paper mode for redeem-and-sell: {}",
+                    e
+                );
+                return Ok(expected_profit);
+            }
+            return Err(e);
         }
 
         info!("RedeemAndSell executed: shares={}, profit={}", shares, expected_profit);
