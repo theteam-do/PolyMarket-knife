@@ -19,4 +19,5 @@ polymarket-client-sdk.workspace = true
 config.workspace = true
 tokio-tungstenite.workspace = true
 futures-util.workspace = true
+common = { version = "0.1.0", path = "../common" }
 reqwest.workspace = true

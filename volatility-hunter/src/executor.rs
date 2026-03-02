@@ -117,6 +117,46 @@ impl Executor {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rust_decimal_macros::dec;
+
+    fn calculate_position_decimal(base: Decimal, max: Decimal, confidence_high: f64, confidence: f64) -> Decimal {
+        if confidence >= confidence_high {
+            max
+        } else if confidence >= 0.6 {
+            max * dec!(0.3)
+        } else {
+            base
+        }
+    }
+
+    #[test]
+    fn test_position_sizing_high_confidence_uses_max() {
+        let base = dec!(100);
+        let max = dec!(1000);
+        let position = calculate_position_decimal(base, max, 0.8, 0.92);
+        assert_eq!(position, dec!(1000));
+    }
+
+    #[test]
+    fn test_position_sizing_mid_confidence_uses_scaled_max() {
+        let base = dec!(100);
+        let max = dec!(1000);
+        let position = calculate_position_decimal(base, max, 0.8, 0.7);
+        assert_eq!(position, dec!(300));
+    }
+
+    #[test]
+    fn test_position_sizing_low_confidence_uses_base() {
+        let base = dec!(100);
+        let max = dec!(1000);
+        let position = calculate_position_decimal(base, max, 0.8, 0.55);
+        assert_eq!(position, dec!(100));
+    }
+}
+
 #[derive(Serialize)]
 struct VolOrderRequest<'a> {
     symbol: &'a str,

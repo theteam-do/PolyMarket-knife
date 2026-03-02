@@ -8,6 +8,16 @@ use serde::Deserialize;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{debug, info, warn};
 
+/// 新闻条目
+#[derive(Debug, Clone)]
+pub struct NewsItem {
+    pub source: String,
+    pub title: String,
+    pub content: String,
+    pub timestamp: u64,
+    pub market: Option<String>,
+}
+
 pub struct NewsCollector {
     sources: SourcesConfig,
     client: Client,
@@ -212,13 +222,4 @@ mod tests {
         assert_eq!(parse_published_at(Some("   ")), None);
         assert_eq!(parse_published_at(None), None);
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct NewsItem {
-    pub source: String,
-    pub title: String,
-    pub content: String,
-    pub timestamp: u64,
-    pub market: Option<String>,
 }

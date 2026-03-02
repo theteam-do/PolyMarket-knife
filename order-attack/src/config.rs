@@ -108,6 +108,54 @@ impl Config {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let content = std::fs::read_to_string(path)?;
         let config: Config = toml::from_str(&content)?;
+        config.validate()?;
         Ok(config)
+    }
+
+    /// 验证配置的有效性
+    fn validate(&self) -> Result<()> {
+        // 验证警告配置
+        if !self.warning.testnet_only {
+            anyhow::bail!("⚠️ This strategy is ONLY for testnet! testnet_only must be true");
+        }
+        if !self.warning.acknowledged {
+            anyhow::bail!("⚠️ You must acknowledge the risks! Set acknowledged = true");
+        }
+
+        // 验证策略配置
+        if self.strategy.attack_gas_limit == 0 {
+            anyhow::bail!("attack_gas_limit must be > 0");
+        }
+        if self.strategy.attack_gas_limit > 1_000_000 {
+            anyhow::bail!(
+                "attack_gas_limit too high: {}",
+                self.strategy.attack_gas_limit
+            );
+        }
+        if self.strategy.min_liquidity_usd <= 0.0 {
+            anyhow::bail!("min_liquidity_usd must be > 0");
+        }
+        if self.strategy.max_attacks_per_day == 0 {
+            anyhow::bail!("max_attacks_per_day must be > 0");
+        }
+        if self.strategy.cooldown_seconds == 0 {
+            anyhow::bail!("cooldown_seconds must be > 0");
+        }
+
+        // 验证监控配置
+        if self.monitor.clearing_timeout_seconds == 0 {
+            anyhow::bail!("clearing_timeout_seconds must be > 0");
+        }
+        if self.monitor.poll_interval_ms < 50 {
+            anyhow::bail!("poll_interval_ms must be >= 50ms");
+        }
+        if self.monitor.max_levels_per_side == 0 {
+            anyhow::bail!("max_levels_per_side must be > 0");
+        }
+        if self.monitor.max_depth_per_side <= 0.0 {
+            anyhow::bail!("max_depth_per_side must be > 0");
+        }
+
+        Ok(())
     }
 }

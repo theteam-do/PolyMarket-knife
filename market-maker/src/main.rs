@@ -2,6 +2,7 @@
 
 use anyhow::{Context, Result};
 use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -193,9 +194,10 @@ impl MarketMaker {
             (None, None) => {
                 warn!("Both orders failed for market {}", market_id);
                 self.metrics.record_order(OrderStatus::Failed);
+                let pnl_loss = Decimal::from_f64_retain(0.01).unwrap_or(Decimal::new(1, 2));
                 let mut risk = self.risk_manager.lock().await;
-                risk.update_pnl(-0.01);
-                self.metrics.record_pnl(Decimal::new(-1, 2));
+                risk.update_pnl(-pnl_loss.to_f64().unwrap_or(0.01));
+                self.metrics.record_pnl(-pnl_loss);
             }
             (Some(order_id), None) | (None, Some(order_id)) => {
                 warn!("Partial fill for market {}. Cancelling surviving order {}", market_id, order_id);

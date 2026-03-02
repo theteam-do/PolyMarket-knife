@@ -47,6 +47,8 @@ impl ChainMonitor {
     }
 
     /// 启动 WebSocket 订阅并将解析的交易发送到 channel
+    /// 
+    /// 注意：使用 ethers v2 进行链上事件监控，alloy 用于交易签名和提交
     pub async fn stream_trades(&self, tx: mpsc::Sender<TradeEvent>) -> Result<()> {
         let ws_url = self
             .config
@@ -57,6 +59,8 @@ impl ChainMonitor {
 
         info!("Connecting to Polygon WebSocket RPC: {}", ws_url);
         
+        // 使用 ethers v2 的 WebSocket 提供者进行事件订阅
+        // 这是目前最稳定的链上事件监控方案
         let provider = Provider::<Ws>::connect(&ws_url)
             .await
             .context("Failed to connect to Polygon WS RPC")?;
@@ -70,12 +74,13 @@ impl ChainMonitor {
         
         info!("Subscribed to OrderFilled events on Polygon Exchange: {}", POLYMARKET_EXCHANGE);
 
-        while let Some(log) = stream.next().await {
-            match log {
+        while let Some(log_result) = stream.next().await {
+            match log_result {
                 Ok(event) => {
                     let maker = format!("{:?}", event.maker);
                     let taker = format!("{:?}", event.taker);
                     
+                    // 检查是否为智能钱地址
                     let is_smart_maker = self.config.strategy.smart_addresses.is_empty() 
                         || self.config.strategy.smart_addresses.iter().any(|a| a.eq_ignore_ascii_case(&maker));
                         
@@ -178,11 +183,13 @@ impl ChainMonitor {
                     }
                 }
                 Err(e) => {
-                    error!("Error receiving event: {}", e);
+                    error!("Error receiving event: {}. Attempting to continue...", e);
+                    // 继续监听，不中断流
                 }
             }
         }
 
-        Ok(())
+        warn!("Event stream ended, reconnecting...");
+        anyhow::bail!("Event stream ended")
     }
 }

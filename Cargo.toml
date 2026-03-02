@@ -2,6 +2,7 @@
 resolver = "2"
 
 members = [
+    "common",
     "monitor",
     "market-maker",
     "arbitrage",

@@ -20,3 +20,4 @@ config.workspace = true
 reqwest.workspace = true
 ethers.workspace = true
 futures-util.workspace = true
+common = { version = "0.1.0", path = "../common" }
