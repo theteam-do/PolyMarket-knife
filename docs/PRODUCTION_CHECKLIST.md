@@ -84,7 +84,7 @@ vault kv get secret/polymarket
 
 ```toml
 [polygon]
-rpc_url = "https://polygon-rpc.com"
+rpc_url = "https://polygon-bor-rpc.publicnode.com"
 # 私钥从环境变量读取
 
 [clob]

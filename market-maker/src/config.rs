@@ -81,7 +81,7 @@ impl Config {
         Ok(Self {
             polygon: PolygonConfig {
                 rpc_url: std::env::var("POLYGON_RPC_URL")
-                    .unwrap_or_else(|_| "https://polygon-rpc.com".to_string()),
+                    .unwrap_or_else(|_| "https://polygon-bor-rpc.publicnode.com".to_string()),
                 private_key: std::env::var("POLYMARKET_PRIVATE_KEY").unwrap_or_default(),
             },
             clob: ClobConfig {
@@ -179,7 +179,7 @@ mod tests {
         let path = write_temp_config(
             r#"
 [polygon]
-rpc_url = "https://polygon-rpc.com"
+rpc_url = "https://polygon-bor-rpc.publicnode.com"
 private_key = "0xabc"
 
 [clob]
@@ -219,7 +219,7 @@ max_order_size_usd = 500.0
         let path = write_temp_config(
             r#"
 [polygon]
-rpc_url = "https://polygon-rpc.com"
+rpc_url = "https://polygon-bor-rpc.publicnode.com"
 
 [clob]
 host = "https://clob.polymarket.com"

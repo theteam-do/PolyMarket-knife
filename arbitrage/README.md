@@ -35,7 +35,7 @@
 ```toml
 # config/arbitrage.toml
 [polygon]
-rpc_url = "wss://polygon-rpc.com"
+rpc_url = "wss://polygon-bor-rpc.publicnode.com"
 private_key = "0x..."
 
 [clob]

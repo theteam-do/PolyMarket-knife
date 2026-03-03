@@ -165,7 +165,7 @@ $ cargo build --release
 ```bash
 $ ./target/release/arbitrage config/arbitrage.toml
 INFO Arbitrage starting...
-INFO Config loaded: rpc_url=https://polygon-rpc.com gas_price_gwei=50 mode=Paper environment=Testnet live_ack=false fallback_to_paper=true
+INFO Config loaded: rpc_url=https://polygon-bor-rpc.publicnode.com gas_price_gwei=50 mode=Paper environment=Testnet live_ack=false fallback_to_paper=true
 INFO Arbitrage initialized
 ```
 
@@ -173,7 +173,7 @@ INFO Arbitrage initialized
 ```bash
 $ ./target/release/follow-trade config/follow-trade.toml
 INFO Follow Trader starting...
-INFO Config loaded: rpc_url=https://polygon-rpc.com mode=Paper environment=Testnet live_ack=false fallback_to_paper=true
+INFO Config loaded: rpc_url=https://polygon-bor-rpc.publicnode.com mode=Paper environment=Testnet live_ack=false fallback_to_paper=true
 INFO Monitoring 2 smart addresses
 ```
 
@@ -282,7 +282,7 @@ test result: ok. 3 passed; 0 failed
 $ ./target/release/arbitrage config/arbitrage.toml
 
 INFO Arbitrage starting...
-INFO Config loaded: rpc_url=https://polygon-rpc.com 
+INFO Config loaded: rpc_url=https://polygon-bor-rpc.publicnode.com 
      gas_price_gwei=50 mode=Paper environment=Testnet 
      live_ack=false fallback_to_paper=true
 INFO [PAPER] Arbitrage execution simulated: 

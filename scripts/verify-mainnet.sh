@@ -162,7 +162,7 @@ echo ""
 echo "7. 检查网络连通性..."
 
 # 检查 Polygon RPC
-if curl -s --max-time 5 https://polygon-rpc.com > /dev/null; then
+if curl -s --max-time 5 https://polygon-bor-rpc.publicnode.com > /dev/null; then
     check_pass "Polygon RPC 可达"
 else
     check_fail "Polygon RPC 不可达"

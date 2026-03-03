@@ -1,7 +1,7 @@
 # Volatility Hunter 配置文件
 
 [polygon]
-rpc_url = "wss://polygon-rpc.com"
+rpc_url = "wss://polygon-bor-rpc.publicnode.com"
 private_key = "YOUR_PRIVATE_KEY_HERE"
 
 [clob]

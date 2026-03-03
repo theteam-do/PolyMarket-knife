@@ -44,7 +44,7 @@ export POLYMARKET_PRIVATE_KEY="your_testnet_private_key"
 | 网络 | RPC URL | CLOB Host |
 |------|---------|-----------|
 | Mumbai | https://rpc-mumbai.maticvigil.com | https://testnet-clob.polymarket.com |
-| Polygon 主网 | https://polygon-rpc.com | https://clob.polymarket.com |
+| Polygon 主网 | https://polygon-bor-rpc.publicnode.com | https://clob.polymarket.com |
 
 ## 3. 运行测试
 

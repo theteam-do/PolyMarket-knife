@@ -52,7 +52,7 @@ live_failure_fallback_to_paper = true
 **主网 RPC**:
 ```toml
 [polygon]
-rpc_url = "https://polygon-rpc.com"
+rpc_url = "https://polygon-bor-rpc.publicnode.com"
 # 或使用付费 RPC 提高稳定性
 # rpc_url = "https://polygon-mainnet.g.alchemy.com/v2/YOUR_KEY"
 ```
@@ -228,7 +228,7 @@ curl http://localhost:9090/metrics
 # config/arbitrage-mainnet.toml
 
 [polygon]
-rpc_url = "https://polygon-rpc.com"
+rpc_url = "https://polygon-bor-rpc.publicnode.com"
 # 私钥通过环境变量 POLYMARKET_PRIVATE_KEY 设置
 
 [clob]
@@ -255,7 +255,7 @@ live_failure_fallback_to_paper = true
 # config/follow-trade-mainnet.toml
 
 [polygon]
-rpc_url = "https://polygon-rpc.com"
+rpc_url = "https://polygon-bor-rpc.publicnode.com"
 
 [clob]
 host = "https://clob.polymarket.com"
@@ -286,7 +286,7 @@ live_failure_fallback_to_paper = true
 # config/market-maker-mainnet.toml
 
 [polygon]
-rpc_url = "https://polygon-rpc.com"
+rpc_url = "https://polygon-bor-rpc.publicnode.com"
 
 [clob]
 host = "https://clob.polymarket.com"

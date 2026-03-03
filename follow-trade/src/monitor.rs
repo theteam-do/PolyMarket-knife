@@ -55,7 +55,7 @@ impl ChainMonitor {
             .polygon
             .ws_rpc_url
             .clone()
-            .unwrap_or_else(|| "wss://polygon-mainnet.g.alchemy.com/v2/YOUR_API_KEY".to_string());
+            .unwrap_or_else(|| "wss://polygon-bor-rpc.publicnode.com".to_string());
 
         info!("Connecting to Polygon WebSocket RPC: {}", ws_url);
         

@@ -2,7 +2,7 @@
 # ⚠️ 请确保遵守当地法律法规
 
 [polygon]
-rpc_url = "wss://polygon-rpc.com"
+rpc_url = "wss://polygon-bor-rpc.publicnode.com"
 private_key = "YOUR_PRIVATE_KEY_HERE"
 
 [sources]

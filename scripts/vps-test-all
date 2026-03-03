@@ -1,0 +1,52 @@
+#!/bin/bash
+# VPS 策略测试脚本
+
+KEY="$HOME/works/agent-keys/agent"
+HOST="95.179.239.239"
+USER="root"
+VPS_PATH="/root/works/PolyMarket-knife"
+PRIVATE_KEY="0x18f0d0ca93a73f451cf42ea17bf4cae1286fd352f81f1a965650ea49fb5951e7"
+TIMEOUT=30
+
+SSH_CMD="ssh -o IdentitiesOnly=yes -i $KEY $USER@$HOST"
+
+echo "========================================="
+echo "PolyMarket Knife - VPS 策略测试"
+echo "========================================="
+echo ""
+
+# 检查连接
+echo "[1/5] 检查 VPS 连接..."
+if ! $SSH_CMD "echo '连接成功'" > /dev/null 2>&1; then
+    echo "❌ VPS 连接失败!"
+    exit 1
+fi
+echo "✅ VPS 连接成功"
+echo ""
+
+# 检查二进制文件
+echo "[2/5] 检查二进制文件..."
+$SSH_CMD "cd $VPS_PATH && ls -lh market-maker arbitrage follow-trade volatility-hunter 2>&1" | grep -E "market-maker|arbitrage|follow-trade|volatility-hunter" || {
+    echo "❌ 二进制文件不存在!"
+    exit 1
+}
+echo ""
+
+# 测试 Market Maker
+echo "[3/5] 测试 Market Maker (超时：${TIMEOUT}s)..."
+$SSH_CMD "cd $VPS_PATH && export POLYMARKET_PRIVATE_KEY='$PRIVATE_KEY' && timeout $TIMEOUT ./market-maker 2>&1" | head -20
+echo ""
+
+# 测试 Arbitrage
+echo "[4/5] 测试 Arbitrage (超时：${TIMEOUT}s)..."
+$SSH_CMD "cd $VPS_PATH && export POLYMARKET_PRIVATE_KEY='$PRIVATE_KEY' && timeout $TIMEOUT ./arbitrage 2>&1" | head -20
+echo ""
+
+# 测试 Follow Trade
+echo "[5/5] 测试 Follow Trade (超时：${TIMEOUT}s)..."
+$SSH_CMD "cd $VPS_PATH && export POLYMARKET_PRIVATE_KEY='$PRIVATE_KEY' && timeout $TIMEOUT ./follow-trade 2>&1" | head -20
+echo ""
+
+echo "========================================="
+echo "测试完成!"
+echo "========================================="

@@ -204,7 +204,7 @@ let client = PolyClient::with_auth(
 host = "https://clob.polymarket.com"
 
 [polygon]
-rpc_url = "https://polygon-rpc.com"
+rpc_url = "https://polygon-bor-rpc.publicnode.com"
 private_key = "YOUR_PRIVATE_KEY"  # 自动派生 API 凭证
 ```
 

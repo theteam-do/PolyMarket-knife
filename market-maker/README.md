@@ -33,7 +33,7 @@
 ```toml
 # config/market-maker.toml
 [polygong]
-rpc_url = "wss://polygon-rpc.com"
+rpc_url = "wss://polygon-bor-rpc.publicnode.com"
 private_key = "0x..."  #  NEVER commit this
 
 [exchange]

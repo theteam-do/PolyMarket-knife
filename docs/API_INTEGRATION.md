@@ -243,7 +243,7 @@ api_key = ""
 api_secret = ""
 
 [polygon]
-rpc_url = "https://polygon-rpc.com"
+rpc_url = "https://polygon-bor-rpc.publicnode.com"
 private_key = "YOUR_PRIVATE_KEY"  # 用于派生 API 凭证
 ```
 

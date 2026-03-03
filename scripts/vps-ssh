@@ -1,0 +1,14 @@
+#!/bin/bash
+# VPS SSH 快速连接脚本
+
+KEY="$HOME/works/agent-keys/agent"
+HOST="95.179.239.239"
+USER="root"
+
+echo "=== 连接到 VPS ==="
+echo "主机：$HOST"
+echo "用户：$USER"
+echo "密钥：$KEY"
+echo ""
+
+ssh -o IdentitiesOnly=yes -i "$KEY" "$USER@$HOST"
