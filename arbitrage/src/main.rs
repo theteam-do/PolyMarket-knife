@@ -14,8 +14,8 @@ use detector::Detector;
 use executor::Executor;
 use scanner::Scanner;
 use state::MarketState;
-use poly_client::ws_client::{WsClient, WsConfig, ChannelType, WsMessage};
-use tokio::sync::mpsc;
+use polymarket_client_sdk::clob::ws::Client as WsClient;
+use futures::StreamExt;
 use std::sync::Arc;
 
 #[tokio::main]
@@ -43,16 +43,6 @@ async fn main() -> Result<()> {
         config.execution.live_acknowledged
     );
 
-    let ws_market_url = config.clob.ws_market_url.clone().unwrap_or_else(|| "wss://ws-subscriptions-clob.polymarket.com/ws/market".to_string());
-    let ws_user_url = config.clob.ws_user_url.clone().unwrap_or_else(|| "wss://ws-subscriptions-clob.polymarket.com/ws/user".to_string());
-
-    let ws_config = WsConfig {
-        market_url: ws_market_url,
-        user_url: ws_user_url,
-        ..Default::default()
-    };
-    let ws_client = WsClient::new(ws_config);
-
     let scanner = Scanner::new(&config);
     let detector = Arc::new(Detector::new(&config.strategy));
     let executor = Arc::new(Executor::new(&config));
@@ -64,23 +54,19 @@ async fn main() -> Result<()> {
     let asset_ids = state.get_all_assets();
     info!("Initial market state loaded. Tracking {} assets. Subscribing to Market WS...", asset_ids.len());
 
-    let (tx, mut rx) = mpsc::channel(1000);
-    
-    let ws_client = Arc::new(ws_client);
-    let ws_client_clone = Arc::clone(&ws_client);
-    
-    tokio::spawn(async move {
-        if let Err(e) = ws_client_clone.stream_with_reconnect(ChannelType::Market, asset_ids, tx).await {
-            warn!("WebSocket stream error: {}", e);
-        }
-    });
+    // 使用官方 SDK 的 WebSocket 客户端
+    let ws_client = WsClient::default();
+    let stream = ws_client.subscribe_orderbook(asset_ids)
+        .context("Failed to subscribe to orderbook")?;
 
     info!("Arbitrage initialized and waiting for real-time WS events...");
 
-    while let Some(msg) = rx.recv().await {
-        match msg {
-            WsMessage::MarketEvent { event_type, payload } => {
-                if state.update_from_ws_payload(&event_type, &payload) {
+    let mut stream = Box::pin(stream);
+    while let Some(book_result) = stream.next().await {
+        match book_result {
+            Ok(book) => {
+                // 更新市场状态
+                if state.update_from_orderbook(&book) {
                     let markets = state.get_all_markets();
                     if let Some(opportunity) = detector.detect(&markets) {
                         info!("Opportunity detected via WS: {}", opportunity);
@@ -94,8 +80,10 @@ async fn main() -> Result<()> {
                         }
                     }
                 }
-            },
-            _ => {} // Ignore generic or raw messages for now
+            }
+            Err(e) => {
+                warn!("WebSocket error: {}", e);
+            }
         }
     }
 

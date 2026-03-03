@@ -1,13 +1,14 @@
 use crate::scanner::MarketPrice;
+use polymarket_client_sdk::clob::ws::types::response::BookUpdate;
+use polymarket_client_sdk::types::U256;
 use rust_decimal::Decimal;
 use std::collections::HashMap;
-use tracing::debug;
 use std::str::FromStr;
-use serde_json::Value;
+use tracing::debug;
 
 pub struct MarketState {
     pub markets: HashMap<String, MarketPrice>,
-    pub asset_to_market: HashMap<String, (String, bool)>, 
+    pub asset_to_market: HashMap<U256, (String, bool)>,
 }
 
 impl MarketState {
@@ -16,8 +17,12 @@ impl MarketState {
         let mut asset_to_market = HashMap::new();
 
         for m in initial_markets {
-            asset_to_market.insert(m.token_id_yes.clone(), (m.market_id.clone(), true));
-            asset_to_market.insert(m.token_id_no.clone(), (m.market_id.clone(), false));
+            if let Ok(yes_id) = U256::from_str(&m.token_id_yes) {
+                asset_to_market.insert(yes_id, (m.market_id.clone(), true));
+            }
+            if let Ok(no_id) = U256::from_str(&m.token_id_no) {
+                asset_to_market.insert(no_id, (m.market_id.clone(), false));
+            }
             markets.insert(m.market_id.clone(), m);
         }
 
@@ -27,7 +32,7 @@ impl MarketState {
         }
     }
 
-    pub fn get_all_assets(&self) -> Vec<String> {
+    pub fn get_all_assets(&self) -> Vec<U256> {
         self.asset_to_market.keys().cloned().collect()
     }
 
@@ -35,28 +40,7 @@ impl MarketState {
         self.markets.values().cloned().collect()
     }
 
-    pub fn update_from_ws_payload(&mut self, event_type: &str, payload: &Value) -> bool {
-        let mut updated = false;
-        if event_type == "price_change" {
-            if let Some(changes) = payload.get("price_changes").and_then(|c| c.as_array()) {
-                for change in changes {
-                    if let Some(asset_id) = change.get("asset_id").and_then(|a| a.as_str()) {
-                        let price_str = change.get("price").and_then(|p| p.as_str());
-                        if let Some(price_str) = price_str {
-                            if let Ok(price) = Decimal::from_str(price_str) {
-                                if self.update_price(asset_id, price) {
-                                    updated = true;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        updated
-    }
-
-    fn update_price(&mut self, asset_id: &str, price: Decimal) -> bool {
+    fn update_price(&mut self, asset_id: &U256, price: Decimal) -> bool {
         if let Some((market_id, is_yes)) = self.asset_to_market.get(asset_id) {
             if let Some(market) = self.markets.get_mut(market_id) {
                 if *is_yes {
@@ -64,10 +48,46 @@ impl MarketState {
                 } else {
                     market.no_price = price;
                 }
-                debug!("Updated market {} asset {} price to {}", market_id, asset_id, price);
+                debug!(
+                    "Updated market {} asset {} price to {}",
+                    market_id, asset_id, price
+                );
                 return true;
             }
         }
         false
+    }
+
+    /// 从订单簿更新中提取价格信息
+    pub fn update_from_orderbook(&mut self, book: &BookUpdate) -> bool {
+        let asset_id = &book.asset_id;
+        let mut updated = false;
+
+        // 使用最佳买卖价更新
+        if let Some(best_bid) = book.bids.first() {
+            if self.update_price(asset_id, best_bid.price) {
+                updated = true;
+            }
+        }
+
+        if let Some(best_ask) = book.asks.first() {
+            // 对于 NO token，使用相反的逻辑
+            if let Some((market_id, is_yes)) = self.asset_to_market.get(asset_id) {
+                if let Some(market) = self.markets.get_mut(market_id) {
+                    if *is_yes {
+                        market.yes_price = best_ask.price;
+                    } else {
+                        market.no_price = best_ask.price;
+                    }
+                    debug!(
+                        "Updated market {} asset {} ask price to {}",
+                        market_id, asset_id, best_ask.price
+                    );
+                    updated = true;
+                }
+            }
+        }
+
+        updated
     }
 }

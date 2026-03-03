@@ -27,8 +27,6 @@ pub struct PolygonConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct ClobConfig {
     pub host: String,
-    pub ws_market_url: Option<String>,
-    pub ws_user_url: Option<String>,
     pub api_key: Option<String>,
     pub api_secret: Option<String>,
 }

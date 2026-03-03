@@ -24,14 +24,9 @@ impl Executor {
         let order_size = Decimal::from_f64_retain(config.strategy.order_size_usd)
             .unwrap_or(dec!(1000));
 
-        // 创建 CLOB 客户端
-        let mut client = ClobClient::new(&config.clob.host, None, None)?;
-        if let Some(api_key) = &config.clob.api_key {
-            client = client.with_api_key(api_key.clone());
-        }
-        if !config.polygon.private_key.is_empty() {
-            client = client.with_signer(config.polygon.private_key.clone())?;
-        }
+        // 创建 CLOB 客户端（使用官方 SDK，私钥用于签名）
+        let client = ClobClient::new(&config.clob.host, Some(config.polygon.private_key.clone()));
+        info!("CLOB client configured for wallet");
 
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)

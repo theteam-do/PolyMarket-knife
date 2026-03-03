@@ -29,6 +29,7 @@ pub struct ClobConfig {
     pub ws_user_url: Option<String>,
     pub api_key: Option<String>,
     pub api_secret: Option<String>,
+    pub passphrase: Option<String>,
 }
 
 /// 策略配置
@@ -56,19 +57,22 @@ pub struct RiskConfig {
 impl Config {
     /// 从文件加载配置
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let content = std::fs::read_to_string(path)
-            .with_context(|| "Failed to read config file")?;
-        
-        let mut config: Config = toml::from_str(&content)
-            .with_context(|| "Failed to parse config file")?;
+        let content =
+            std::fs::read_to_string(path).with_context(|| "Failed to read config file")?;
+
+        let mut config: Config =
+            toml::from_str(&content).with_context(|| "Failed to parse config file")?;
 
         if config.polygon.private_key.is_empty() {
-            config.polygon.private_key = std::env::var("POLYMARKET_PRIVATE_KEY").unwrap_or_default();
+            config.polygon.private_key = std::env::var("POLYMARKET_PRIVATE_KEY")
+                .unwrap_or_default()
+                .trim()
+                .to_string();
         }
-        
+
         // 验证配置
         config.validate()?;
-        
+
         Ok(config)
     }
 
@@ -78,8 +82,7 @@ impl Config {
             polygon: PolygonConfig {
                 rpc_url: std::env::var("POLYGON_RPC_URL")
                     .unwrap_or_else(|_| "https://polygon-rpc.com".to_string()),
-                private_key: std::env::var("POLYMARKET_PRIVATE_KEY")
-                    .unwrap_or_default(),
+                private_key: std::env::var("POLYMARKET_PRIVATE_KEY").unwrap_or_default(),
             },
             clob: ClobConfig {
                 host: std::env::var("CLOB_HOST")
@@ -88,6 +91,7 @@ impl Config {
                 ws_user_url: std::env::var("CLOB_WS_USER_URL").ok(),
                 api_key: std::env::var("CLOB_API_KEY").ok(),
                 api_secret: std::env::var("CLOB_API_SECRET").ok(),
+                passphrase: std::env::var("CLOB_PASSPHRASE").ok(),
             },
             strategy: StrategyConfig {
                 market_ids: vec![],
@@ -112,7 +116,9 @@ impl Config {
     fn validate(&self) -> Result<()> {
         // 验证私钥
         if self.polygon.private_key.is_empty() {
-            anyhow::bail!("Private key is required. Set POLYMARKET_PRIVATE_KEY environment variable");
+            anyhow::bail!(
+                "Private key is required. Set POLYMARKET_PRIVATE_KEY environment variable"
+            );
         }
 
         // 验证价差

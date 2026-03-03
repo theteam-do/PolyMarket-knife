@@ -15,10 +15,10 @@ thiserror.workspace = true
 anyhow.workspace = true
 rust_decimal.workspace = true
 rust_decimal_macros.workspace = true
-polymarket-client-sdk.workspace = true
+polymarket-client-sdk = { workspace = true, features = ["ws", "tracing"] }
 config.workspace = true
 reqwest.workspace = true
-poly-client = { version = "0.1.0", path = "../poly-client" }
 common = { version = "0.1.0", path = "../common" }
 futures-util.workspace = true
 tokio-tungstenite = { workspace = true, features = ["native-tls"] }
+futures = "0.3"

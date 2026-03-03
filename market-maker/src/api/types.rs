@@ -15,9 +15,9 @@ pub enum Side {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum OrderType {
-    Gtc,  // Good Till Cancelled
-    Fok,  // Fill Or Kill
-    Ioc,  // Immediate Or Cancel
+    Gtc, // Good Till Cancelled
+    Fok, // Fill Or Kill
+    Ioc, // Immediate Or Cancel
 }
 
 /// 订单请求
@@ -60,13 +60,6 @@ pub struct Level {
     pub size: Decimal,
 }
 
-/// 取消订单请求
-#[derive(Debug, Clone, Serialize)]
-pub struct CancelOrderRequest {
-    #[serde(rename = "orderID")]
-    pub order_id: String,
-}
-
 /// 取消订单响应
 #[derive(Debug, Clone, Deserialize)]
 pub struct CancelOrderResponse {
@@ -74,4 +67,3 @@ pub struct CancelOrderResponse {
     #[serde(rename = "orderID")]
     pub order_id: String,
 }
-

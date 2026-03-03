@@ -10,7 +10,6 @@ members = [
     "volatility-hunter",
     "info-edge",
     "order-attack",
-    "poly-client",
 ]
 
 [workspace.package]
@@ -69,7 +68,7 @@ async-trait = "0.1"
 
 # 区块链 (官方 SDK 使用)
 alloy = { version = "1.6", default-features = false, features = ["signer-local"] }
-polymarket-client-sdk = { version = "0.4", features = ["clob", "tracing"] }
+polymarket-client-sdk = { version = "0.4", default-features = false, features = ["clob", "ws", "tracing", "heartbeats"] }
 uuid = { version = "1.6", features = ["serde", "v4"] }
 
 [profile.release]

@@ -1,243 +1,175 @@
-//! Polymarket CLOB API 客户端
-use serde::Serialize;
+//! Polymarket CLOB API 客户端 - 使用官方 SDK 封装
 
 use anyhow::{Context, Result};
-use reqwest::{Client, Response, StatusCode};
-use tracing::{debug, error, instrument};
+use polymarket_client_sdk::clob::{Client as ClobSdkClient, Config};
+use polymarket_client_sdk::clob::types::{Side as SdkSide, OrderType as SdkOrderType, request::CancelMarketOrderRequest};
+use polymarket_client_sdk::types::U256;
+use alloy::signers::local::LocalSigner;
+use alloy::signers::Signer;
+use std::str::FromStr;
+use alloy::primitives::ChainId;
+use tracing::instrument;
 
 use super::types::*;
-use super::signer::OrderSigner;
+
+const POLYGON_CHAIN_ID: ChainId = 137;
 
 /// CLOB API 客户端
 pub struct ClobClient {
-    client: Client,
     host: String,
-    api_key: Option<String>,
-    signer: Option<OrderSigner>,
+    private_key: Option<String>,
 }
 
 impl ClobClient {
-    fn with_auth(&self, builder: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
-        if let Some(key) = &self.api_key {
-            builder.header("X-Api-Key", key)
-        } else {
-            builder
+    /// 创建新的客户端
+    pub fn new(host: &str, private_key: Option<String>) -> Self {
+        Self {
+            host: host.trim_end_matches('/').to_string(),
+            private_key,
         }
     }
 
-    /// 创建新的客户端
-    pub fn new(host: &str, api_key: Option<String>, private_key: Option<String>) -> Result<Self> {
-        let client = Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
-            .build()
-            .context("Failed to create HTTP client")?;
-
-        let signer = if let Some(pk) = private_key {
-            Some(OrderSigner::from_hex(&pk)?)
-        } else {
-            None
-        };
-
-        Ok(Self {
-            client,
-            host: host.trim_end_matches('/').to_string(),
-            api_key,
-            signer,
-        })
-    }
-
-    /// 获取订单簿
+    /// 获取订单簿 (公开端点)
     #[instrument(skip(self))]
     pub async fn get_orderbook(&self, token_id: &str) -> Result<OrderBookResponse> {
-        let url = format!("{}/book?token_id={}", self.host, token_id);
+        use polymarket_client_sdk::clob::types::request::OrderBookSummaryRequest;
         
-        debug!("Fetching orderbook from: {}", url);
+        let client = ClobSdkClient::new(&self.host, Config::default())
+            .context("Failed to create SDK client")?;
         
-        let response = self.with_auth(self.client
-            .get(&url))
-            .send()
-            .await
-            .context("Failed to send orderbook request")?;
-
-        self.parse_response(response).await
+        let token_id_u256 = U256::from_str_radix(token_id, 10)
+            .context("Failed to parse token_id")?;
+        
+        let request = OrderBookSummaryRequest::builder()
+            .token_id(token_id_u256)
+            .build();
+        
+        let book = client.order_book(&request).await
+            .context("Failed to fetch orderbook")?;
+        
+        let bids: Vec<Level> = book.bids.iter().map(|l| Level {
+            price: l.price,
+            size: l.size,
+        }).collect();
+        
+        let asks: Vec<Level> = book.asks.iter().map(|l| Level {
+            price: l.price,
+            size: l.size,
+        }).collect();
+        
+        Ok(OrderBookResponse {
+            token_id: token_id.to_string(),
+            bids,
+            asks,
+            timestamp: book.timestamp.timestamp() as u64,
+        })
     }
-
+    
     /// 下单
     #[instrument(skip(self))]
     pub async fn place_order(&self, request: OrderRequest) -> Result<OrderResponse> {
-        let url = format!("{}/order", self.host);
+        let private_key = self.private_key.as_ref()
+            .context("Private key not configured")?;
         
-        // 签名订单
-        let signed_request = self.sign_order(request).await?;
+        // 创建认证客户端
+        let pk = private_key.strip_prefix("0x").unwrap_or(private_key);
+        let signer = LocalSigner::from_str(pk)
+            .context("Failed to parse private key")?
+            .with_chain_id(Some(POLYGON_CHAIN_ID));
         
-        debug!("Placing order: {:?}", signed_request);
-        
-        let response = self.with_auth(self.client
-            .post(&url))
-            .json(&signed_request)
-            .send()
+        let sdk_client = ClobSdkClient::new(&self.host, Config::default())?
+            .authentication_builder(&signer)
+            .authenticate()
             .await
-            .context("Failed to send order request")?;
-
-        self.parse_response(response).await
+            .context("Failed to authenticate")?;
+        
+        // 构建订单
+        let token_id = U256::from_str_radix(&request.token_id, 10)
+            .context("Failed to parse token_id")?;
+        
+        let order_builder = sdk_client.limit_order()
+            .token_id(token_id)
+            .side(match request.side {
+                Side::Buy => SdkSide::Buy,
+                Side::Sell => SdkSide::Sell,
+            })
+            .price(request.price)
+            .size(request.size)
+            .order_type(match request.order_type {
+                OrderType::Gtc => SdkOrderType::GTC,
+                OrderType::Fok => SdkOrderType::FOK,
+                OrderType::Ioc => SdkOrderType::FAK, // IOC 映射到 FAK (Fill and Kill)
+            });
+        
+        // 构建并签名订单
+        let order = order_builder.build().await
+            .context("Failed to build order")?;
+        
+        let signed_order = sdk_client.sign(&signer, order).await
+            .context("Failed to sign order")?;
+        
+        // 提交订单
+        let response = sdk_client.post_order(signed_order).await
+            .context("Failed to submit order")?;
+        
+        Ok(OrderResponse {
+            success: true,
+            order_id: response.order_id.to_string(),
+            signature: None,
+        })
     }
-
+    
     /// 取消订单
     #[instrument(skip(self))]
     pub async fn cancel_order(&self, order_id: &str) -> Result<CancelOrderResponse> {
-        let url = format!("{}/cancel-order", self.host);
+        let private_key = self.private_key.as_ref()
+            .context("Private key not configured")?;
         
-        let request = CancelOrderRequest {
+        let pk = private_key.strip_prefix("0x").unwrap_or(private_key);
+        let signer = LocalSigner::from_str(pk)?
+            .with_chain_id(Some(POLYGON_CHAIN_ID));
+        
+        let sdk_client = ClobSdkClient::new(&self.host, Config::default())?
+            .authentication_builder(&signer)
+            .authenticate()
+            .await?;
+        
+        // 使用 cancel_orders 批量 API 取消单个订单
+        let response = sdk_client.cancel_orders(&[order_id]).await?;
+        
+        let success = !response.canceled.is_empty();
+        
+        Ok(CancelOrderResponse {
+            success,
             order_id: order_id.to_string(),
-        };
-        
-        debug!("Cancelling order: {}", order_id);
-        
-        let response = self.with_auth(self.client
-            .post(&url))
-            .json(&request)
-            .send()
-            .await
-            .context("Failed to send cancel request")?;
-
-        self.parse_response(response).await
+        })
     }
-
+    
     /// 取消所有订单
     #[instrument(skip(self))]
     pub async fn cancel_all(&self, market: Option<&str>) -> Result<Vec<String>> {
-        let url = format!("{}/cancel-all", self.host);
+        let private_key = self.private_key.as_ref()
+            .context("Private key not configured")?;
         
-        let mut request = serde_json::json!({});
-        if let Some(m) = market {
-            request["market"] = serde_json::json!(m);
-        }
+        let pk = private_key.strip_prefix("0x").unwrap_or(private_key);
+        let signer = LocalSigner::from_str(pk)?
+            .with_chain_id(Some(POLYGON_CHAIN_ID));
         
-        debug!("Cancelling all orders for market: {:?}", market);
+        let sdk_client = ClobSdkClient::new(&self.host, Config::default())?
+            .authentication_builder(&signer)
+            .authenticate()
+            .await?;
         
-        let response = self.with_auth(self.client
-            .post(&url))
-            .json(&request)
-            .send()
-            .await
-            .context("Failed to send cancel-all request")?;
-
-        let result: serde_json::Value = response.json().await?;
-        
-        if let Some(ids) = result.as_array() {
-            Ok(ids.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        let cancelled = if let Some(market_hash) = market {
+            let market_b256 = market_hash.parse::<alloy::primitives::B256>()?;
+            let request = CancelMarketOrderRequest::builder()
+                .market(market_b256)
+                .build();
+            sdk_client.cancel_market_orders(&request).await?
         } else {
-            Ok(vec![])
-        }
-    }
-
-    /// 签名订单
-    async fn sign_order(&self, request: OrderRequest) -> Result<SignedOrderRequest> {
-        let Some(signer) = &self.signer else {
-            anyhow::bail!("Signer not configured");
+            sdk_client.cancel_all_orders().await?
         };
-
-        // 生成订单哈希
-        let order_hash = signer.hash_order(
-            &request.token_id,
-            &request.price.to_string(),
-            &request.size.to_string(),
-            match request.side {
-                Side::Buy => "BUY",
-                Side::Sell => "SELL",
-            },
-            request.nonce,
-            request.expiration,
-        );
-
-        // 签名
-        let signature = signer.sign_order(&order_hash)?;
-
-        Ok(SignedOrderRequest {
-            order: request,
-            signature,
-            signer: signer.address().to_string(),
-        })
-    }
-
-    /// 解析响应
-    async fn parse_response<T: serde::de::DeserializeOwned>(&self, response: Response) -> Result<T> {
-        let status = response.status();
         
-        if status.is_success() {
-            response.json().await.context("Failed to parse response JSON")
-        } else {
-            let error_text = response.text().await.unwrap_or_default();
-            
-            if status == StatusCode::UNAUTHORIZED {
-                error!("Authentication failed: {}", error_text);
-                anyhow::bail!("Authentication failed");
-            } else if status == StatusCode::NOT_FOUND {
-                error!("Resource not found: {}", error_text);
-                anyhow::bail!("Resource not found");
-            } else {
-                error!("API error ({}): {}", status, error_text);
-                anyhow::bail!("API error ({}): {}", status, error_text);
-            }
-        }
-    }
-
-    /// 设置 API Key
-    pub fn with_api_key(mut self, api_key: String) -> Self {
-        self.api_key = Some(api_key);
-        self
-    }
-
-    /// 设置签名器
-    pub fn with_signer(mut self, private_key: String) -> Result<Self> {
-        self.signer = Some(OrderSigner::from_hex(&private_key)?);
-        Ok(self)
-    }
-}
-
-/// 签名后的订单请求
-#[derive(Debug, Clone, Serialize)]
-struct SignedOrderRequest {
-    #[serde(flatten)]
-    order: OrderRequest,
-    signature: String,
-    signer: String,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use rust_decimal_macros::dec;
-
-    #[test]
-    fn test_client_creation() {
-        let client = ClobClient::new(
-            "https://testnet-clob.polymarket.com",
-            Some("test_key".to_string()),
-            Some("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".to_string()),
-        ).unwrap();
-        
-        assert!(client.signer.is_some());
-        assert!(client.api_key.is_some());
-    }
-
-    #[tokio::test]
-    async fn test_order_request_serialization() {
-        let request = OrderRequest {
-            token_id: "123456".to_string(),
-            price: dec!(0.50),
-            size: dec!(100),
-            side: Side::Buy,
-            order_type: OrderType::Gtc,
-            expiration: 0,
-            nonce: 1234567890,
-            signer: "0x...".to_string(),
-        };
-
-        let json = serde_json::to_string(&request).unwrap();
-        
-        assert!(json.contains("123456"));
-        assert!(json.contains("0.50"));
-        assert!(json.contains("BUY"));
+        Ok(cancelled.canceled.iter().map(|id| id.to_string()).collect())
     }
 }
