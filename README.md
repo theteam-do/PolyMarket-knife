@@ -64,18 +64,17 @@ vim config/market-maker.toml
 export POLYMARKET_PRIVATE_KEY="your_private_key"
 ```
 
-### 5. 运行
+### 5. 部署到 VPS
 
 ```bash
-# 运行做市商
-./target/release/market-maker --config config/market-maker.toml
+# 本地编译并上传到 VPS（推荐）
+./scripts/deploy-to-vps.sh
 
-# 运行套利
-./target/release/arbitrage --config config/arbitrage.toml
-
-# 运行跟单
-./target/release/follow-trade --config config/follow-trade.toml
+# 运行主网测试
+./scripts/mainnet-test.sh
 ```
+
+详细部署指南：[docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md)
 
 ## 📚 文档
 
@@ -97,6 +96,12 @@ export POLYMARKET_PRIVATE_KEY="your_private_key"
 - [部署指南](docs/DEPLOYMENT.md) - 生产环境部署
 - [常见问题](docs/FAQ.md) - FAQ
 - [贡献指南](CONTRIBUTING.md) - 如何贡献
+
+### 资源链接
+
+- [聪明钱追踪方案](Poly-smart.md) - 完整社区资源、工具汇总
+- [官方文档](https://docs.polymarket.com) - Polymarket API 文档
+- [Discord 社区](https://discord.gg/polymarket) - 官方社区
 
 ## 📊 监控指标
 
