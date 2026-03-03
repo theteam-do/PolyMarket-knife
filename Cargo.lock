@@ -650,7 +650,7 @@ dependencies = [
  "futures",
  "futures-util",
  "polymarket-client-sdk",
- "reqwest 0.12.28",
+ "reqwest 0.13.2",
  "rust_decimal",
  "rust_decimal_macros",
  "serde",
@@ -2584,7 +2584,7 @@ dependencies = [
  "ethers",
  "futures-util",
  "polymarket-client-sdk",
- "reqwest 0.12.28",
+ "reqwest 0.13.2",
  "rust_decimal",
  "rust_decimal_macros",
  "serde",
@@ -3146,22 +3146,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hyper-tls"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70206fc6890eaca9fde8a0bf71caa2ddfc9fe045ac9e5c70df101a7dbde866e0"
-dependencies = [
- "bytes",
- "http-body-util",
- "hyper 1.8.1",
- "hyper-util",
- "native-tls",
- "tokio",
- "tokio-native-tls",
- "tower-service",
-]
-
-[[package]]
 name = "hyper-util"
 version = "0.1.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3178,7 +3162,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.2",
+ "socket2 0.5.10",
  "system-configuration 0.7.0",
  "tokio",
  "tower-service",
@@ -3400,7 +3384,7 @@ dependencies = [
  "config",
  "polymarket-client-sdk",
  "regex",
- "reqwest 0.12.28",
+ "reqwest 0.13.2",
  "rust_decimal",
  "rust_decimal_macros",
  "serde",
@@ -3727,7 +3711,7 @@ dependencies = [
  "criterion",
  "mockall",
  "polymarket-client-sdk",
- "reqwest 0.12.28",
+ "reqwest 0.13.2",
  "rust_decimal",
  "rust_decimal_macros",
  "serde",
@@ -4042,7 +4026,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "config",
- "reqwest 0.12.28",
+ "reqwest 0.13.2",
  "rust_decimal",
  "serde",
  "serde_json",
@@ -4643,7 +4627,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls 0.23.37",
- "socket2 0.6.2",
+ "socket2 0.5.10",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -4681,7 +4665,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.6.2",
+ "socket2 0.5.10",
  "tracing",
  "windows-sys 0.60.2",
 ]
@@ -4957,21 +4941,15 @@ checksum = "eddd3ca559203180a307f12d114c268abf583f59b03cb906fd0b3ff8646c1147"
 dependencies = [
  "base64 0.22.1",
  "bytes",
- "encoding_rs",
  "futures-core",
- "futures-util",
- "h2 0.4.13",
  "http 1.4.0",
  "http-body 1.0.1",
  "http-body-util",
  "hyper 1.8.1",
  "hyper-rustls 0.27.7",
- "hyper-tls",
  "hyper-util",
  "js-sys",
  "log",
- "mime",
- "native-tls",
  "percent-encoding",
  "pin-project-lite",
  "quinn",
@@ -4982,16 +4960,13 @@ dependencies = [
  "serde_urlencoded",
  "sync_wrapper 1.0.2",
  "tokio",
- "tokio-native-tls",
  "tokio-rustls 0.26.4",
- "tokio-util",
  "tower",
  "tower-http",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wasm-streams",
  "web-sys",
  "webpki-roots 1.0.6",
 ]
@@ -5006,6 +4981,7 @@ dependencies = [
  "bytes",
  "encoding_rs",
  "futures-core",
+ "futures-util",
  "h2 0.4.13",
  "http 1.4.0",
  "http-body 1.0.1",
@@ -5028,12 +5004,14 @@ dependencies = [
  "sync_wrapper 1.0.2",
  "tokio",
  "tokio-rustls 0.26.4",
+ "tokio-util",
  "tower",
  "tower-http",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wasm-streams",
  "web-sys",
 ]
 
@@ -6881,7 +6859,7 @@ dependencies = [
  "config",
  "futures-util",
  "polymarket-client-sdk",
- "reqwest 0.12.28",
+ "reqwest 0.13.2",
  "rust_decimal",
  "rust_decimal_macros",
  "serde",
@@ -7029,9 +7007,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-streams"
-version = "0.4.2"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15053d8d85c7eccdbefef60f06769760a563c7f0a9d6902a13d35c7800b0ad65"
+checksum = "9d1ec4f6517c9e11ae630e200b2b65d193279042e28edd4a2cda233e46670bbb"
 dependencies = [
  "futures-util",
  "js-sys",
@@ -7132,7 +7110,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
