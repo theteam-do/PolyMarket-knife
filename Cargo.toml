@@ -31,7 +31,7 @@ toml = "0.8"
 # HTTP/WebSocket
 reqwest = { version = "0.12", features = ["json", "stream"] }
 tungstenite = "0.26"
-tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
+tokio-tungstenite = { version = "0.28", features = ["native-tls"] }
 
 # 日志
 tracing = "0.1"
