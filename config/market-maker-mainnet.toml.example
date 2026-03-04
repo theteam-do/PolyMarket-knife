@@ -1,0 +1,26 @@
+[polygon]
+rpc_url = "https://polygon-rpc.com"
+private_key = ""
+
+[clob]
+host = "https://clob.polymarket.com"
+
+[strategy]
+market_ids = ["111128191581505463501777127559667396812474366956707382672202929745167742497287"]
+spread_bps = 50
+order_size_usd = 3.0
+refresh_interval_ms = 5000
+skew_inventory = false
+min_spread_bps = 20
+max_spread_bps = 20000
+
+[risk]
+max_position_usd = 10.0
+max_loss_per_day = 2.0
+stop_loss_pct = 0.1
+max_orders = 2
+max_order_size_usd = 5.0
+
+[execution]
+mode = "live"
+live_acknowledged = true
