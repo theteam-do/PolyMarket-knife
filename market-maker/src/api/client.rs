@@ -87,14 +87,23 @@ impl ClobClient {
         let token_id = U256::from_str_radix(&request.token_id, 10)
             .context("Failed to parse token_id")?;
         
+        let tick_size = sdk_client.tick_size(token_id).await
+            .context("Failed to fetch tick size")?
+            .minimum_tick_size
+            .as_decimal();
+        let decimals = tick_size.scale();
+        
+        let price = request.price.round_dp(decimals);
+        let size = request.size.round_dp(2);
+        
         let order_builder = sdk_client.limit_order()
             .token_id(token_id)
             .side(match request.side {
                 Side::Buy => SdkSide::Buy,
                 Side::Sell => SdkSide::Sell,
             })
-            .price(request.price)
-            .size(request.size)
+            .price(price)
+            .size(size)
             .order_type(match request.order_type {
                 OrderType::Gtc => SdkOrderType::GTC,
                 OrderType::Fok => SdkOrderType::FOK,
@@ -102,7 +111,11 @@ impl ClobClient {
             });
         
         // 构建并签名订单
-        let order = order_builder.build().await
+        let order_res = order_builder.build().await;
+        if let Err(ref e) = order_res {
+            tracing::error!("Order build error details: {:?}", e);
+        }
+        let order = order_res
             .context("Failed to build order")?;
         
         let signed_order = sdk_client.sign(&signer, order).await

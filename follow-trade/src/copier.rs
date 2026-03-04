@@ -1,31 +1,32 @@
 //! 交易复制器 - 使用官方 SDK 复制聪明钱交易
 
-use anyhow::Result;
-use reqwest::Client;
+use anyhow::{Context, Result};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use serde::Serialize;
 use tracing::{info, instrument, warn};
+use std::str::FromStr;
+
+use polymarket_client_sdk::clob::{Client as ClobSdkClient, Config as ClobConfig};
+use polymarket_client_sdk::clob::types::{Side as SdkSide, OrderType as SdkOrderType};
+use polymarket_client_sdk::types::U256;
+use alloy::signers::local::LocalSigner;
+use alloy::signers::Signer;
+use alloy::primitives::ChainId;
 
 use crate::config::Config;
 use crate::config::ExecutionMode;
 use crate::monitor::TradeEvent;
 
+const POLYGON_CHAIN_ID: ChainId = 137;
+
 pub struct TradeCopier {
     config: Config,
-    http_client: Client,
 }
 
 impl TradeCopier {
     pub fn new(config: &Config) -> Self {
-        let http_client = Client::builder()
-            .timeout(std::time::Duration::from_secs(10))
-            .build()
-            .unwrap_or_default();
-
         Self {
             config: config.clone(),
-            http_client,
         }
     }
 
@@ -46,7 +47,8 @@ impl TradeCopier {
         match self.execute_live(trade, size).await {
             Ok(order_id) => {
                 info!("Order placed successfully: {}", order_id);
-                return Ok(size * dec!(0.1));
+                // Return estimated profit or size based on strategy
+                return Ok(size * dec!(0.05)); // 5% mock profit placeholder
             }
             Err(e) => {
                 if self.config.execution.live_failure_fallback_to_paper {
@@ -58,38 +60,62 @@ impl TradeCopier {
         }
     }
 
-    /// 使用 CLOB HTTP 接口执行跟单
+    /// 使用 CLOB API SDK 执行跟单
     async fn execute_live(&self, trade: &TradeEvent, size: Decimal) -> Result<String> {
-        let endpoint = format!("{}/order", self.config.clob.host.trim_end_matches('/'));
-        let payload = CopyOrderRequest {
-            market: &trade.market,
-            market_id: &trade.market_id,
-            side: match trade.side {
-                crate::monitor::Side::Buy => "BUY",
-                crate::monitor::Side::Sell => "SELL",
-            },
-            size,
-            price: trade.price,
-            source_wallet: &trade.from,
-            source_ts: trade.timestamp,
+        let private_key = self.config.clob.api_secret.as_deref()
+            .or(Some(&self.config.polygon.private_key))
+            .context("Private key not configured for live execution")?;
+        
+        // 解析私钥并创建签名器
+        let pk = private_key.strip_prefix("0x").unwrap_or(private_key);
+        let signer = LocalSigner::from_str(pk)
+            .context("Failed to parse private key")?
+            .with_chain_id(Some(POLYGON_CHAIN_ID));
+        
+        let host = self.config.clob.host.trim_end_matches('/');
+        let sdk_client = ClobSdkClient::new(host, ClobConfig::default())?
+            .authentication_builder(&signer)
+            .authenticate()
+            .await
+            .context("Failed to authenticate with CLOB API")?;
+
+        // 解析 token_id. trade.market_id is actually the assetId in hex (with or without 0x)
+        let token_id_str = trade.market_id.strip_prefix("0x").unwrap_or(&trade.market_id);
+        let token_id = U256::from_str_radix(token_id_str, 16)
+            .context("Failed to parse token_id from trade event")?;
+
+        let side = match trade.side {
+            crate::monitor::Side::Buy => SdkSide::Buy,
+            crate::monitor::Side::Sell => SdkSide::Sell,
         };
 
-        let mut request = self.http_client.post(endpoint).json(&payload);
-        if let Some(key) = &self.config.clob.api_key {
-            request = request.header("X-Api-Key", key);
-        }
-        if let Some(secret) = &self.config.clob.api_secret {
-            request = request.header("X-Api-Secret", secret);
-        }
+        let tick_size = sdk_client.tick_size(token_id).await
+            .context("Failed to fetch tick size")?
+            .minimum_tick_size
+            .as_decimal();
+        let decimals = tick_size.scale();
 
-        let response = request.send().await?;
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            anyhow::bail!("Live copy order rejected {}: {}", status, body);
-        }
+        let price = trade.price.round_dp(decimals);
+        let size = size.round_dp(2);
 
-        Ok(format!("copy-{}-{}", trade.market_id, trade.timestamp))
+        // Directly use the rust_decimal::Decimal that the SDK expects
+        let order_builder = sdk_client.limit_order()
+            .token_id(token_id)
+            .side(side)
+            .price(price)
+            .size(size)
+            .order_type(SdkOrderType::GTC);
+
+        let order = order_builder.build().await
+            .context("Failed to build order")?;
+        
+        let signed_order = sdk_client.sign(&signer, order).await
+            .context("Failed to sign order")?;
+        
+        let response = sdk_client.post_order(signed_order).await
+            .context("Failed to submit order")?;
+        
+        Ok(response.order_id.to_string())
     }
 
     /// 模拟执行（用于测试）
@@ -109,15 +135,4 @@ impl TradeCopier {
         
         size.clamp(min_size, max_size)
     }
-}
-
-#[derive(Serialize)]
-struct CopyOrderRequest<'a> {
-    market: &'a str,
-    market_id: &'a str,
-    side: &'a str,
-    size: Decimal,
-    price: Decimal,
-    source_wallet: &'a str,
-    source_ts: u64,
 }
