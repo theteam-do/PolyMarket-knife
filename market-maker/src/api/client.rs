@@ -2,7 +2,10 @@
 
 use anyhow::{Context, Result};
 use polymarket_client_sdk::clob::{Client as ClobSdkClient, Config};
-use polymarket_client_sdk::clob::types::{Side as SdkSide, OrderType as SdkOrderType, request::CancelMarketOrderRequest};
+use polymarket_client_sdk::clob::types::{
+    Side as SdkSide, OrderType as SdkOrderType, request::CancelMarketOrderRequest,
+    request::UpdateBalanceAllowanceRequest, AssetType,
+};
 use polymarket_client_sdk::types::U256;
 use alloy::signers::local::LocalSigner;
 use alloy::signers::Signer;
@@ -79,9 +82,20 @@ impl ClobClient {
         
         let sdk_client = ClobSdkClient::new(&self.host, Config::default())?
             .authentication_builder(&signer)
+            
             .authenticate()
             .await
             .context("Failed to authenticate")?;
+        
+        // 更新余额/授权缓存 - 这是 Python SDK 成功的关键步骤
+        // 确保 CLOB 后端有最新的链上余额和授权状态
+        sdk_client
+            .update_balance_allowance(UpdateBalanceAllowanceRequest::builder()
+                .asset_type(AssetType::Collateral)
+                .build())
+            .await
+            .context("Failed to update balance allowance")?;
+        tracing::info!("Successfully updated balance/allowance cache");
         
         // 构建订单
         let token_id = U256::from_str_radix(&request.token_id, 10)
@@ -144,6 +158,7 @@ impl ClobClient {
         
         let sdk_client = ClobSdkClient::new(&self.host, Config::default())?
             .authentication_builder(&signer)
+            
             .authenticate()
             .await?;
         
@@ -170,6 +185,7 @@ impl ClobClient {
         
         let sdk_client = ClobSdkClient::new(&self.host, Config::default())?
             .authentication_builder(&signer)
+            
             .authenticate()
             .await?;
         
