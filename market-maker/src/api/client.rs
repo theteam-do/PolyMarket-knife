@@ -135,9 +135,22 @@ impl ClobClient {
         let signed_order = sdk_client.sign(&signer, order).await
             .context("Failed to sign order")?;
         
-        // 提交订单
-        let response = sdk_client.post_order(signed_order).await
-            .context("Failed to submit order")?;
+        // 提交订单 - 捕获详细错误
+        let post_result = sdk_client.post_order(signed_order).await;
+        match &post_result {
+            Ok(resp) => {
+                tracing::info!("Order submitted successfully: order_id={}", resp.order_id);
+            }
+            Err(e) => {
+                tracing::error!("Order submission failed: {:?}", e);
+                // 尝试提取 HTTP 响应体中的错误详情
+                let err_str = format!("{:?}", e);
+                if err_str.contains("status") {
+                    tracing::error!("HTTP error details: {}", err_str);
+                }
+            }
+        }
+        let response = post_result.context("Failed to submit order")?;
         
         Ok(OrderResponse {
             success: true,

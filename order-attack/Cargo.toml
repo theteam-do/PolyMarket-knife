@@ -2,7 +2,11 @@
 name = "order-attack"
 version.workspace = true
 edition.workspace = true
-description = "订单攻击策略 - 利用撮合机制漏洞 (仅供学习)"
+description = "Order attack strategy - exploiting matching mechanism edge cases (educational only)"
+license.workspace = true
+repository.workspace = true
+keywords = ["polymarket", "trading", "research", "educational"]
+categories = ["development-tools", "finance"]
 [dependencies]
 tokio.workspace = true
 serde.workspace = true

@@ -705,6 +705,7 @@ checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 name = "arbitrage"
 version = "0.1.0"
 dependencies = [
+ "alloy",
  "anyhow",
  "common",
  "config",
@@ -3122,6 +3123,7 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 name = "follow-trade"
 version = "0.1.0"
 dependencies = [
+ "alloy",
  "anyhow",
  "common",
  "config",
@@ -6881,6 +6883,13 @@ name = "termtree"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f50febec83f5ee1df3015341d8bd429f2d1cc62bcba7ea2076759d315084683"
+
+[[package]]
+name = "test_decimal"
+version = "0.1.0"
+dependencies = [
+ "rust_decimal",
+]
 
 [[package]]
 name = "thiserror"

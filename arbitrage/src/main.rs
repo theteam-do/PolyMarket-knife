@@ -1,7 +1,7 @@
 //! Arbitrage - 简化工作版本
 
 use anyhow::{Context, Result};
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 mod config;
 mod detector;
@@ -17,13 +17,16 @@ use state::MarketState;
 use polymarket_client_sdk::clob::ws::Client as WsClient;
 use futures::StreamExt;
 use std::sync::Arc;
+use std::time::Duration;
+use tokio::time::sleep;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("arbitrage=info".parse()?),
+                .add_directive("arbitrage=info".parse()
+                    .expect("Failed to parse log directive")),
         )
         .init();
 
@@ -47,6 +50,36 @@ async fn main() -> Result<()> {
     let detector = Arc::new(Detector::new(&config.strategy));
     let executor = Arc::new(Executor::new(&config));
 
+    // 主循环：带重连逻辑
+    let mut reconnect_delay = Duration::from_secs(1);
+    let max_reconnect_delay = Duration::from_secs(60);
+
+    loop {
+        match run_arbitrage_loop(&config, &scanner, &detector, &executor).await {
+            Ok(()) => {
+                // 正常退出（通常不会发生）
+                break;
+            }
+            Err(e) => {
+                error!("Arbitrage loop error: {}. Reconnecting in {}s...", e, reconnect_delay.as_secs());
+                sleep(reconnect_delay).await;
+                
+                // 指数退避
+                reconnect_delay = (reconnect_delay * 2).min(max_reconnect_delay);
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+/// 运行套利主循环
+async fn run_arbitrage_loop(
+    _config: &Config,
+    scanner: &Scanner,
+    detector: &Arc<Detector>,
+    executor: &Arc<Executor>,
+) -> Result<()> {
     info!("Fetching initial market state via HTTP...");
     let initial_markets = scanner.scan().await?;
     let mut state = MarketState::new(initial_markets);
@@ -83,9 +116,12 @@ async fn main() -> Result<()> {
             }
             Err(e) => {
                 warn!("WebSocket error: {}", e);
+                // 返回错误以触发重连
+                return Err(e).context("WebSocket stream error");
             }
         }
     }
 
-    Ok(())
+    // 流结束，返回错误以触发重连
+    anyhow::bail!("WebSocket stream ended unexpectedly")
 }

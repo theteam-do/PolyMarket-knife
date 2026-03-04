@@ -6,35 +6,25 @@ use anyhow::Result;
 use serde::Deserialize;
 
 /// 执行模式
-#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ExecutionMode {
     /// 模拟模式，不实际下单
+    #[default]
     Paper,
     /// 实盘模式，实际下单
     Live,
 }
 
-impl Default for ExecutionMode {
-    fn default() -> Self {
-        Self::Paper
-    }
-}
-
 /// 运行环境
-#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum RuntimeEnvironment {
     /// 测试网环境
+    #[default]
     Testnet,
     /// 主网环境
     Mainnet,
-}
-
-impl Default for RuntimeEnvironment {
-    fn default() -> Self {
-        Self::Testnet
-    }
 }
 
 /// 执行配置

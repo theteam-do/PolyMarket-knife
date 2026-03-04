@@ -1,7 +1,7 @@
 //! 监控指标 - Prometheus 格式
 
-use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
+use rust_decimal::Decimal;
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -52,7 +52,10 @@ impl MetricsCollector {
         let pnl_cents = (pnl * Decimal::from(100))
             .round()
             .to_i64()
-            .unwrap_or(0);
+            .unwrap_or_else(|| {
+                tracing::warn!("PnL value out of range: {}", pnl);
+                0
+            });
         self.daily_pnl.fetch_add(pnl_cents, Ordering::Relaxed);
         self.last_update
             .store(current_timestamp(), Ordering::Relaxed);
@@ -62,7 +65,10 @@ impl MetricsCollector {
         let volume_cents = (volume * Decimal::from(100))
             .round()
             .to_u64()
-            .unwrap_or(0);
+            .unwrap_or_else(|| {
+                tracing::warn!("Volume value out of range: {}", volume);
+                0
+            });
         self.daily_volume.fetch_add(volume_cents, Ordering::Relaxed);
         self.last_update
             .store(current_timestamp(), Ordering::Relaxed);
@@ -141,7 +147,7 @@ pub enum OrderStatus {
 fn current_timestamp() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .unwrap()
+        .expect("System time is before UNIX epoch")
         .as_secs()
 }
 

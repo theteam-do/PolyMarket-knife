@@ -2,7 +2,11 @@
 name = "market-maker"
 version.workspace = true
 edition.workspace = true
-description = "Polymarket 返佣做市策略 - 生产级实现"
+description = "Market making strategy for Polymarket CLOB - production grade implementation"
+license.workspace = true
+repository.workspace = true
+keywords = ["polymarket", "market-making", "trading", "clob"]
+categories = ["development-tools", "finance"]
 
 [dependencies]
 tokio.workspace = true

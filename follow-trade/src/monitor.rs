@@ -147,7 +147,7 @@ impl ChainMonitor {
 
                     let timestamp = std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
+                        .expect("System time is before UNIX epoch")
                         .as_secs();
                         
                     // 修正 Token ID 格式，Polymarket CLOB API 通常期望 '0x' 前缀的 16 进制 assetId

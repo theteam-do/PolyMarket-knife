@@ -230,7 +230,9 @@ async fn start_metrics_server(metrics: Arc<MetricsCollector>) -> Result<()> {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpListener;
 
-    let addr: SocketAddr = "0.0.0.0:9090".parse().unwrap();
+    let addr: SocketAddr = "0.0.0.0:9090"
+        .parse()
+        .expect("Failed to parse metrics server address");
     let listener = TcpListener::bind(addr).await?;
     
     info!("Metrics server listening on http://{}", addr);

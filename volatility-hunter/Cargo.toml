@@ -2,7 +2,11 @@
 name = "volatility-hunter"
 version.workspace = true
 edition.workspace = true
-description = "超短期波动狩猎策略"
+description = "Short-term volatility hunting strategy for Polymarket"
+license.workspace = true
+repository.workspace = true
+keywords = ["polymarket", "volatility", "trading", "clob"]
+categories = ["development-tools", "finance"]
 
 [dependencies]
 tokio.workspace = true

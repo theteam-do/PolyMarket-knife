@@ -2,7 +2,11 @@
 name = "follow-trade"
 version.workspace = true
 edition.workspace = true
-description = "Polymarket 跟单策略"
+description = "Copy trading strategy for Polymarket - following smart money trades"
+license.workspace = true
+repository.workspace = true
+keywords = ["polymarket", "copy-trading", "smart-money", "clob"]
+categories = ["development-tools", "finance"]
 
 [dependencies]
 tokio.workspace = true
@@ -21,3 +25,4 @@ reqwest.workspace = true
 ethers.workspace = true
 futures-util.workspace = true
 common = { version = "0.1.0", path = "../common" }
+alloy.workspace = true

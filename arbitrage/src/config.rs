@@ -27,7 +27,12 @@ pub struct PolygonConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct ClobConfig {
     pub host: String,
+    /// API Key (保留用于未来扩展，当前使用私钥派生)
+    #[serde(default)]
+    #[allow(dead_code)]
     pub api_key: Option<String>,
+    /// API Secret / 私钥 (用于签名)
+    #[serde(default)]
     pub api_secret: Option<String>,
 }
 

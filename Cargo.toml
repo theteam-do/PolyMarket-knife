@@ -11,13 +11,22 @@ members = [
     "info-edge",
     "order-attack",
     "rs-clob-client",
+    "test_decimal",
 ]
+
+# polymarket-cli 使用不同的依赖版本，独立构建
+exclude = ["polymarket-cli"]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
 authors = ["PolyMarket Knife Team"]
 license = "MIT"
+description = "PolyMarket Knife - Advanced trading strategies for Polymarket CLOB"
+repository = "https://github.com/polymarket/PolyMarket-knife"
+keywords = ["polymarket", "trading", "clob", "defi"]
+categories = ["finance", "development-tools"]
+readme = "README.md"
 
 [workspace.dependencies]
 # 异步运行时

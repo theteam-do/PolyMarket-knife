@@ -2,7 +2,11 @@
 name = "monitor"
 version.workspace = true
 edition.workspace = true
-description = "监控告警模块"
+description = "Monitoring and alerting module for PolyMarket Knife trading strategies"
+license.workspace = true
+repository.workspace = true
+keywords = ["polymarket", "monitoring", "alerting", "trading"]
+categories = ["development-tools", "finance"]
 
 [dependencies]
 tokio.workspace = true

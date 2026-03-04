@@ -2,7 +2,11 @@
 name = "info-edge"
 version.workspace = true
 edition.workspace = true
-description = "信息差交易策略 - NLP 监控新闻源"
+description = "Information edge trading strategy - NLP monitoring of news sources"
+license.workspace = true
+repository.workspace = true
+keywords = ["polymarket", "nlp", "news", "trading"]
+categories = ["development-tools", "finance"]
 
 [dependencies]
 tokio.workspace = true

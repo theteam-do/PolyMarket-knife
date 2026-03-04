@@ -2,7 +2,11 @@
 name = "arbitrage"
 version.workspace = true
 edition.workspace = true
-description = "Polymarket 套利策略"
+description = "Arbitrage strategy for Polymarket CLOB - detecting and executing price discrepancies"
+license.workspace = true
+repository.workspace = true
+keywords = ["polymarket", "arbitrage", "trading", "clob"]
+categories = ["development-tools", "finance"]
 
 [dependencies]
 tokio = { workspace = true, features = ["full"] }
@@ -22,3 +26,4 @@ common = { version = "0.1.0", path = "../common" }
 futures-util.workspace = true
 tokio-tungstenite = { workspace = true, features = ["native-tls"] }
 futures = "0.3"
+alloy.workspace = true
