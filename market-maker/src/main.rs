@@ -84,7 +84,7 @@ impl MarketMaker {
                     match self.tick().await {
                         Ok(_) => {
                             tick_count += 1;
-                            if tick_count % 100 == 0 {
+                            if tick_count.is_multiple_of(100) {
                                 info!("Processed {} ticks", tick_count);
                             }
                         }
@@ -117,7 +117,7 @@ impl MarketMaker {
         }
 
         // 对每个市场更新报价
-        for market_id in &self.config.strategy.market_ids.clone() {
+        for market_id in self.config.strategy.market_ids.clone() {
             if let Err(e) = self.update_market(&market_id).await {
                 error!("Failed to update market {}: {}", market_id, e);
                 self.metrics.record_order(OrderStatus::Failed);

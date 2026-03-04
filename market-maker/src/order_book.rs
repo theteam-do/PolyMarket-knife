@@ -41,7 +41,7 @@ impl OrderBook {
     }
 
     pub fn mid_price_decimal(&self) -> Option<Decimal> {
-        self.mid_price().and_then(|p| Decimal::from_f64_retain(p))
+        self.mid_price().and_then(Decimal::from_f64_retain)
     }
 
     pub fn spread(&self) -> Option<f64> {

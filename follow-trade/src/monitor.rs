@@ -127,7 +127,7 @@ impl ChainMonitor {
                     let mut size_usd = usdc_amount;
                     if is_smart_taker {
                         // Taker 被扣除手续费，所以其净头寸规模会小一点
-                        size_usd = size_usd - fee_amt;
+                        size_usd -= fee_amt;
                     }
 
                     if size_usd <= Decimal::ZERO {

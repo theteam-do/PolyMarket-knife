@@ -19,6 +19,17 @@ use crate::detector::ArbOpportunity;
 
 const POLYGON_CHAIN_ID: ChainId = 137;
 
+/// 套利执行参数
+#[derive(Debug, Clone)]
+struct ArbitrageParams {
+    token_id_yes: String,
+    token_id_no: String,
+    price_yes: Decimal,
+    price_no: Decimal,
+    profit_per_share: Decimal,
+    shares: Decimal,
+}
+
 /// 套利执行器
 pub struct Executor {
     config: Config,
@@ -69,21 +80,21 @@ impl Executor {
                 market_id,
                 ..
             } => {
+                let params = ArbitrageParams {
+                    token_id_yes: token_id_yes.clone(),
+                    token_id_no: token_id_no.clone(),
+                    price_yes: *price_yes,
+                    price_no: *price_no,
+                    profit_per_share: *profit_per_share,
+                    shares: *max_shares,
+                };
+                
                 info!(
                     "Executing BuyAndMint: market={}, yes_token={}, no_token={}, shares={}, expected_profit/share={}",
-                    market_id, token_id_yes, token_id_no, max_shares, profit_per_share
+                    market_id, params.token_id_yes, params.token_id_no, params.shares, params.profit_per_share
                 );
 
-                self.execute_buy_and_mint(
-                    market_id,
-                    token_id_yes,
-                    token_id_no,
-                    *price_yes,
-                    *price_no,
-                    *profit_per_share,
-                    *max_shares,
-                )
-                .await
+                self.execute_buy_and_mint(market_id, &params).await
             }
             ArbOpportunity::RedeemAndSell {
                 token_id_yes,
@@ -95,21 +106,21 @@ impl Executor {
                 market_id,
                 ..
             } => {
+                let params = ArbitrageParams {
+                    token_id_yes: token_id_yes.clone(),
+                    token_id_no: token_id_no.clone(),
+                    price_yes: *price_yes,
+                    price_no: *price_no,
+                    profit_per_share: *profit_per_share,
+                    shares: *max_shares,
+                };
+                
                 info!(
                     "Executing RedeemAndSell: market={}, yes_token={}, no_token={}, shares={}, expected_profit/share={}",
-                    market_id, token_id_yes, token_id_no, max_shares, profit_per_share
+                    market_id, params.token_id_yes, params.token_id_no, params.shares, params.profit_per_share
                 );
                 
-                self.execute_redeem_and_sell(
-                    market_id,
-                    token_id_yes,
-                    token_id_no,
-                    *price_yes,
-                    *price_no,
-                    *profit_per_share,
-                    *max_shares,
-                )
-                .await
+                self.execute_redeem_and_sell(market_id, &params).await
             }
         }
     }
@@ -123,22 +134,24 @@ impl Executor {
     async fn execute_buy_and_mint(
         &self,
         _market_id: &str,
-        token_id_yes: &str,
-        token_id_no: &str,
-        price_yes: Decimal,
-        price_no: Decimal,
-        profit_per_share: Decimal,
-        shares: Decimal,
+        params: &ArbitrageParams,
     ) -> Result<Decimal> {
-        if shares <= Decimal::ZERO || profit_per_share <= Decimal::ZERO {
-            warn!("Skip buy-and-mint due to invalid params: shares={}, profit/share={}", shares, profit_per_share);
+        if params.shares <= Decimal::ZERO || params.profit_per_share <= Decimal::ZERO {
+            warn!("Skip buy-and-mint due to invalid params: shares={}, profit/share={}", params.shares, params.profit_per_share);
             return Ok(dec!(0));
         }
 
-        let total_cost = (dec!(1.0) - profit_per_share) * shares;
-        let expected_profit = profit_per_share * shares;
+        let total_cost = (dec!(1.0) - params.profit_per_share) * params.shares;
+        let expected_profit = params.profit_per_share * params.shares;
 
-        if let Err(e) = self.place_clob_orders(token_id_yes, token_id_no, price_yes, price_no, shares, SdkSide::Buy).await {
+        if let Err(e) = self.place_clob_orders(
+            &params.token_id_yes,
+            &params.token_id_no,
+            params.price_yes,
+            params.price_no,
+            params.shares,
+            SdkSide::Buy,
+        ).await {
             if self.config.execution.live_failure_fallback_to_paper {
                 warn!(
                     "Live submit failed, fallback to paper mode for buy-and-mint: {:?}", 
@@ -149,7 +162,7 @@ impl Executor {
             return Err(e);
         }
 
-        info!("BuyAndMint (CLOB orders) executed: shares={}, cost={}, expected_profit={}", shares, total_cost, expected_profit);
+        info!("BuyAndMint (CLOB orders) executed: shares={}, cost={}, expected_profit={}", params.shares, total_cost, expected_profit);
 
         Ok(expected_profit)
     }
@@ -163,21 +176,23 @@ impl Executor {
     async fn execute_redeem_and_sell(
         &self,
         _market_id: &str,
-        token_id_yes: &str,
-        token_id_no: &str,
-        price_yes: Decimal,
-        price_no: Decimal,
-        profit_per_share: Decimal,
-        shares: Decimal,
+        params: &ArbitrageParams,
     ) -> Result<Decimal> {
-        if shares <= Decimal::ZERO || profit_per_share <= Decimal::ZERO {
-            warn!("Skip redeem-and-sell due to invalid params: shares={}, profit/share={}", shares, profit_per_share);
+        if params.shares <= Decimal::ZERO || params.profit_per_share <= Decimal::ZERO {
+            warn!("Skip redeem-and-sell due to invalid params: shares={}, profit/share={}", params.shares, params.profit_per_share);
             return Ok(dec!(0));
         }
 
-        let expected_profit = profit_per_share * shares;
+        let expected_profit = params.profit_per_share * params.shares;
 
-        if let Err(e) = self.place_clob_orders(token_id_yes, token_id_no, price_yes, price_no, shares, SdkSide::Sell).await {
+        if let Err(e) = self.place_clob_orders(
+            &params.token_id_yes,
+            &params.token_id_no,
+            params.price_yes,
+            params.price_no,
+            params.shares,
+            SdkSide::Sell,
+        ).await {
             if self.config.execution.live_failure_fallback_to_paper {
                 warn!(
                     "Live submit failed, fallback to paper mode for redeem-and-sell: {:?}", 
@@ -188,7 +203,7 @@ impl Executor {
             return Err(e);
         }
 
-        info!("RedeemAndSell (CLOB orders) executed: shares={}, profit={}", shares, expected_profit);
+        info!("RedeemAndSell (CLOB orders) executed: shares={}, profit={}", params.shares, expected_profit);
         Ok(expected_profit)
     }
 
