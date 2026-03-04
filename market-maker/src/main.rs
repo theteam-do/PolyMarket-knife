@@ -21,6 +21,8 @@ use executor::Executor;
 use metrics::{MetricsCollector, OrderStatus};
 use quoting::Quoter;
 use risk::RiskManager;
+use monitor::alerts::{AlertConfig, AlertManager};
+use rust_decimal_macros::dec;
 
 /// 做市商主结构
 pub struct MarketMaker {
@@ -29,6 +31,7 @@ pub struct MarketMaker {
     quoter: Quoter,
     risk_manager: Arc<Mutex<RiskManager>>,
     metrics: Arc<MetricsCollector>,
+    alert_manager: Arc<Mutex<AlertManager>>,
     running: bool,
 }
 
@@ -39,6 +42,18 @@ impl MarketMaker {
         let quoter = Quoter::new(&config.strategy);
         let risk_manager = Arc::new(Mutex::new(RiskManager::new(&config.risk)));
         let metrics = Arc::new(MetricsCollector::new());
+        
+        // 初始化告警管理器
+        let alert_config = AlertConfig {
+            daily_loss_threshold: dec!(500),
+            daily_loss_warning_pct: 0.8,
+            position_threshold: dec!(10000),
+            api_error_rate_threshold: 0.1,
+            latency_threshold_ms: 100.0,
+            consecutive_loss_threshold: 5,
+            cooldown_duration: std::time::Duration::from_secs(60),
+        };
+        let alert_manager = Arc::new(Mutex::new(AlertManager::new(alert_config)));
 
         info!("Market Maker initialized");
         info!("Monitoring {} markets", config.strategy.market_ids.len());
@@ -51,6 +66,7 @@ impl MarketMaker {
             quoter,
             risk_manager,
             metrics,
+            alert_manager,
             running: false,
         })
     }
@@ -114,6 +130,14 @@ impl MarketMaker {
                 warn!("Risk manager blocked trading");
                 return Ok(());
             }
+            
+            // 监控告警：检查日亏损
+            let daily_pnl = risk.daily_pnl();
+            let mut alert_mgr = self.alert_manager.lock().await;
+            let alerts = alert_mgr.check_daily_loss(Decimal::from_f64_retain(daily_pnl).unwrap_or(Decimal::ZERO));
+            for alert in alerts {
+                warn!("🚨 ALERT: {}", alert.message);
+            }
         }
 
         // 对每个市场更新报价
@@ -121,6 +145,13 @@ impl MarketMaker {
             if let Err(e) = self.update_market(&market_id).await {
                 error!("Failed to update market {}: {}", market_id, e);
                 self.metrics.record_order(OrderStatus::Failed);
+                
+                // 监控告警：订单失败
+                let mut alert_mgr = self.alert_manager.lock().await;
+                let alerts = alert_mgr.record_order_failure(&market_id, &e.to_string());
+                for alert in alerts {
+                    error!("🚨 ALERT: {}", alert.message);
+                }
             }
         }
 
