@@ -3,6 +3,7 @@
 //! 包含所有策略共享的配置结构，避免代码重复
 
 use anyhow::Result;
+use secrecy::SecretString;
 use serde::Deserialize;
 
 /// 执行模式
@@ -90,9 +91,9 @@ pub struct PolygonConfig {
     pub rpc_url: String,
     /// WebSocket RPC URL（可选）
     pub ws_rpc_url: Option<String>,
-    /// 私钥（可从环境变量加载）
+    /// 私钥（可从环境变量加载），内存敏感，零化释放
     #[serde(default)]
-    pub private_key: String,
+    pub private_key: SecretString,
 }
 
 /// CLOB 配置
@@ -105,9 +106,17 @@ pub struct ClobConfig {
     /// 用户数据 WebSocket URL
     pub ws_user_url: Option<String>,
     /// API Key
+    #[serde(default)]
     pub api_key: Option<String>,
     /// API Secret
+    #[serde(default)]
     pub api_secret: Option<String>,
+    /// API Passphrase
+    #[serde(default)]
+    pub passphrase: Option<String>,
+    /// Proxy URL
+    #[serde(default)]
+    pub proxy_url: Option<String>,
 }
 
 #[cfg(test)]

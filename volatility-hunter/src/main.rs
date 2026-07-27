@@ -1,6 +1,8 @@
 //! Volatility Hunter - 波动狩猎完整实现
 
 use anyhow::{Context, Result};
+use common::{PaperEventKind, PaperRunReporter, RunMode, StrategyKind};
+use rust_decimal::prelude::ToPrimitive;
 use tracing::{info, warn};
 
 mod binance_ws;
@@ -10,7 +12,7 @@ mod risk;
 mod signal;
 
 use binance_ws::BinanceFeed;
-use config::Config;
+use config::{Config, ExecutionMode};
 use executor::Executor;
 use risk::RiskManager;
 use signal::SignalGenerator;
@@ -43,6 +45,20 @@ impl Hunter {
         info!("Volatility Hunter starting...");
         info!("Monitoring symbols: {:?}", self.config.strategy.symbols);
 
+        let mut reporter = PaperRunReporter::new(
+            StrategyKind::VolatilityHunter,
+            run_mode(self.config.execution.mode),
+            "Volatility Hunter",
+            None,
+        );
+        reporter.start(format!(
+            "mode={:?} symbols={} volatility_threshold={} momentum_threshold={}",
+            self.config.execution.mode,
+            self.config.strategy.symbols.len(),
+            self.config.strategy.volatility_threshold,
+            self.config.strategy.momentum_threshold
+        ));
+
         // 启动币安数据流
         let (tx, mut rx) = tokio::sync::mpsc::channel(1000);
         let binance_feed = BinanceFeed::new(&self.config.binance);
@@ -59,20 +75,35 @@ impl Hunter {
         let mut total_pnl = rust_decimal::Decimal::ZERO;
 
         while self.running {
-            if let Some(tick) = rx.recv().await {
-                match self.on_tick(tick).await {
-                    Ok(Some(profit)) => {
-                        signals_generated += 1;
-                        trades_executed += 1;
-                        total_pnl += profit;
-                        info!(
-                            "Signals: {} Trades: {} PnL: ${}",
-                            signals_generated, trades_executed, total_pnl
-                        );
-                    }
-                    Ok(None) => {}
-                    Err(e) => {
-                        warn!("Tick error: {}", e);
+            tokio::select! {
+                _ = tokio::signal::ctrl_c() => {
+                    info!("Shutdown signal received");
+                    self.stop();
+                }
+                tick = rx.recv() => {
+                    match tick {
+                        Some(tick) => {
+                            match self.on_tick(tick, &mut reporter).await {
+                                Ok((signal_generated, profit)) => {
+                                    if signal_generated {
+                                        signals_generated += 1;
+                                    }
+                                    if let Some(profit) = profit {
+                                        trades_executed += 1;
+                                        total_pnl += profit;
+                                        info!(
+                                            "Signals: {} Trades: {} PnL: ${}",
+                                            signals_generated, trades_executed, total_pnl
+                                        );
+                                    }
+                                }
+                                Err(e) => {
+                                    warn!("Tick error: {}", e);
+                                    reporter.error("Tick error", e.to_string());
+                                }
+                            }
+                        }
+                        None => break,
                     }
                 }
             }
@@ -82,34 +113,100 @@ impl Hunter {
             "Hunter stopped. Signals: {} Trades: {} PnL: ${}",
             signals_generated, trades_executed, total_pnl
         );
+        reporter.stop(format!(
+            "signals={} trades={} pnl=${}",
+            signals_generated, trades_executed, total_pnl
+        ));
         Ok(())
     }
 
-    async fn on_tick(&mut self, tick: PriceTick) -> Result<Option<rust_decimal::Decimal>> {
+    async fn on_tick(
+        &mut self,
+        tick: PriceTick,
+        reporter: &mut PaperRunReporter,
+    ) -> Result<(bool, Option<rust_decimal::Decimal>)> {
         // 1. 生成信号
         if let Some(signal) = self.signal_gen.generate(&tick) {
             info!("Signal generated: {:?}", signal);
+            let estimated_position = self.executor.estimate_position_usd(&signal);
+            reporter.update(
+                PaperEventKind::SignalGenerated,
+                "Signal generated",
+                format!(
+                    "symbol={} confidence={:.2} estimated_position=${:.2}",
+                    signal.symbol(),
+                    signal.confidence(),
+                    estimated_position
+                ),
+                None,
+                None,
+                |snapshot| {
+                    snapshot.metrics.signals_generated += 1;
+                    snapshot.metrics.exposure_usd = estimated_position.to_f64().unwrap_or(0.0);
+                },
+            );
 
             // 2. 风控检查
             if !self.risk_manager.can_trade(&signal) {
                 warn!("Risk check failed");
-                return Ok(None);
+                reporter.warning(
+                    "Risk check failed",
+                    format!(
+                        "symbol={} confidence={:.2}",
+                        signal.symbol(),
+                        signal.confidence()
+                    ),
+                );
+                return Ok((true, None));
             }
 
             // 3. 执行交易
             match self.executor.execute(&signal).await {
                 Ok(profit) => {
                     self.risk_manager.update_pnl(profit);
-                    return Ok(Some(profit));
+                    let profit_f64 = profit.to_f64().unwrap_or(0.0);
+                    reporter.update(
+                        PaperEventKind::ExecutionSimulated,
+                        if self.config.execution.mode == ExecutionMode::Paper {
+                            "Paper execution simulated"
+                        } else {
+                            "Execution completed"
+                        },
+                        format!(
+                            "symbol={} profit=${:.2} estimated_position=${:.2}",
+                            signal.symbol(),
+                            profit_f64,
+                            estimated_position
+                        ),
+                        None,
+                        Some(profit_f64),
+                        |snapshot| {
+                            snapshot.metrics.trades_executed += 1;
+                            if self.config.execution.mode == ExecutionMode::Paper {
+                                snapshot.metrics.simulated_orders += 1;
+                            }
+                            snapshot.metrics.daily_pnl_usd += profit_f64;
+                            snapshot.metrics.total_pnl_usd += profit_f64;
+                            snapshot.metrics.exposure_usd =
+                                estimated_position.to_f64().unwrap_or(0.0);
+                        },
+                    );
+                    return Ok((true, Some(profit)));
                 }
                 Err(e) => {
                     warn!("Execution failed: {}", e);
                     self.risk_manager.update_pnl(rust_decimal::Decimal::ZERO);
+                    reporter.error(
+                        "Execution failed",
+                        format!("symbol={} error={}", signal.symbol(), e),
+                    );
                 }
             }
+
+            return Ok((true, None));
         }
 
-        Ok(None)
+        Ok((false, None))
     }
 
     pub fn stop(&mut self) {
@@ -152,10 +249,12 @@ async fn main() -> Result<()> {
 
     let mut hunter = Hunter::new(config)?;
 
-    tokio::spawn(async move {
-        tokio::signal::ctrl_c().await.unwrap();
-        info!("Shutting down...");
-    });
-
     hunter.run().await
+}
+
+fn run_mode(mode: ExecutionMode) -> RunMode {
+    match mode {
+        ExecutionMode::Paper => RunMode::Paper,
+        ExecutionMode::Live => RunMode::Live,
+    }
 }

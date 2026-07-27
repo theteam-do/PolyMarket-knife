@@ -29,5 +29,13 @@
 //! ```
 
 pub mod config;
+pub mod edge;
+pub mod probability;
+pub mod sizing;
+pub mod telemetry;
 
 pub use config::*;
+pub use edge::*;
+pub use probability::*;
+pub use sizing::*;
+pub use telemetry::*;

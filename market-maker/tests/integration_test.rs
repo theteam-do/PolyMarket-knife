@@ -1,42 +1,69 @@
 //! Market Maker 集成测试
-//!
-//! 测试订单簿、报价和风控功能
 
-use rust_decimal::Decimal;
+use market_maker::config::{RiskConfig, SideMode, StrategyConfig};
+use market_maker::order_book::{Level, OrderBook};
+use market_maker::quoting::Quoter;
+use market_maker::risk::{OpenOrderSide, RiskManager};
 use rust_decimal_macros::dec;
 
-/// 测试订单簿基本操作
 #[test]
 fn test_order_book_basic() {
-    // 这个测试需要在 market-maker crate 中实现
-    // 由于 OrderBook 是 crate 内部的，我们需要通过公共 API 测试
-    assert!(true); // 占位符，实际测试需要导出 OrderBook
+    let mut book = OrderBook::new("token-1".to_string());
+    book.bids = vec![Level {
+        price: 0.49,
+        size: 100.0,
+    }];
+    book.asks = vec![Level {
+        price: 0.51,
+        size: 120.0,
+    }];
+    book.update_best();
+
+    assert_eq!(book.best_bid, Some(0.49));
+    assert_eq!(book.best_ask, Some(0.51));
+    assert_eq!(book.mid_price(), Some(0.50));
 }
 
-/// 测试风控限制
 #[test]
-fn test_risk_limits() {
-    // 测试风控配置
-    assert!(true); // 占位符
+fn test_risk_limits_track_exact_order_ids() {
+    let mut risk = RiskManager::new(&RiskConfig {
+        max_position_usd: 1_000.0,
+        max_loss_per_day: 100.0,
+        stop_loss_pct: 5.0,
+        max_orders: 4,
+        max_order_size_usd: 300.0,
+    });
+
+    assert!(risk.can_place_orders("market-1", &[120.0, 120.0]));
+    risk.reserve_open_order("buy-1", "market-1", OpenOrderSide::Buy, 0.50, 240.0);
+    risk.reserve_open_order("sell-1", "market-1", OpenOrderSide::Sell, 0.52, 250.0);
+
+    assert!((risk.market_open_order_value("market-1") - 250.0).abs() < 1e-9);
+    assert!(!risk.can_place_orders("market-1", &[120.0, 120.0]));
+
+    risk.release_open_order("buy-1");
+    assert!((risk.market_open_order_value("market-1") - 130.0).abs() < 1e-9);
 }
 
-/// 测试报价计算
 #[test]
 fn test_quote_calculation() {
-    // 测试买卖价差计算
-    let spread_bps = 100; // 1%
-    let mid_price = 0.50;
+    let quoter = Quoter::new(&StrategyConfig {
+        market_ids: vec![],
+        spread_bps: 100,
+        order_size_usd: 1000.0,
+        refresh_interval_ms: 100,
+        skew_inventory: false,
+        min_spread_bps: 50,
+        max_spread_bps: 200,
+        side_mode: SideMode::TwoSided,
+    });
 
-    let half_spread = (mid_price * spread_bps as f64) / 10000.0 / 2.0;
-    let bid = mid_price - half_spread;
-    let ask = mid_price + half_spread;
-
+    let (bid, ask) = quoter.calculate_quotes_with_position(0.50, 0.0);
     assert!((bid - 0.4975).abs() < 0.0001);
     assert!((ask - 0.5025).abs() < 0.0001);
     assert!((ask - bid - 0.005).abs() < 0.0001);
 }
 
-/// 测试 Decimal 精度
 #[test]
 fn test_decimal_precision() {
     let price1 = dec!(0.50123);
@@ -49,44 +76,21 @@ fn test_decimal_precision() {
     assert!((diff - dec!(0.00246)).abs() < dec!(0.00001));
 }
 
-/// 测试订单大小计算
 #[test]
-fn test_order_size_calculation() {
-    let order_size_usd = 1000.0;
-    let price = 0.50;
+fn test_inventory_skew_biases_quotes() {
+    let quoter = Quoter::new(&StrategyConfig {
+        market_ids: vec![],
+        spread_bps: 100,
+        order_size_usd: 1000.0,
+        refresh_interval_ms: 100,
+        skew_inventory: true,
+        min_spread_bps: 50,
+        max_spread_bps: 200,
+        side_mode: SideMode::TwoSided,
+    });
 
-    let shares = order_size_usd / price;
-    assert!((shares - 2000.0).abs() < 0.01);
-}
+    let (_plain_bid, plain_ask) = quoter.calculate_quotes_with_position(0.50, 0.0);
+    let (_skewed_bid, skewed_ask) = quoter.calculate_quotes_with_position(0.50, 1.0);
 
-/// 测试 PnL 计算
-#[test]
-fn test_pnl_calculation() {
-    let entry_price = dec!(0.50);
-    let exit_price = dec!(0.55);
-    let shares = dec!(1000);
-
-    let pnl = (exit_price - entry_price) * shares;
-    assert!((pnl - dec!(50)).abs() < dec!(0.01));
-}
-
-/// 测试库存偏斜
-#[test]
-fn test_inventory_skew() {
-    // 当持仓偏向 YES 时，应该降低 YES 卖价
-    let mid_price = dec!(0.50);
-    let inventory_yes = dec!(5000);
-    let inventory_no = dec!(1000);
-    let net_inventory = inventory_yes - inventory_no;
-
-    // 净持仓为正，应该偏向卖出
-    assert!(net_inventory > dec!(0));
-
-    // 简单的偏斜计算
-    let skew_factor = dec!(0.001); // 0.1% 每单位库存
-    let adjusted_bid = mid_price - (net_inventory * skew_factor);
-    let adjusted_ask = mid_price + (net_inventory * skew_factor);
-
-    assert!(adjusted_bid < mid_price);
-    assert!(adjusted_ask > mid_price);
+    assert!(skewed_ask < plain_ask);
 }

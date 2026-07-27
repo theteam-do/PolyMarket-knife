@@ -94,9 +94,7 @@ impl OrderAttacker {
         if let Some(target) = targets.first() {
             info!(
                 "🎯 Target identified: market={} liquidity_usd={:.2} has_prices={}",
-                target.market,
-                target.liquidity_usd,
-                target.has_prices
+                target.market, target.liquidity_usd, target.has_prices
             );
 
             // 2. 执行攻击

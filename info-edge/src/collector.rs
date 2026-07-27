@@ -3,12 +3,12 @@
 use crate::config::SourcesConfig;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
+use regex::Regex;
 use reqwest::Client;
 use serde::Deserialize;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{debug, info, warn};
 
-/// 新闻条目
 #[derive(Debug, Clone)]
 pub struct NewsItem {
     pub source: String,
@@ -38,14 +38,20 @@ struct Article {
 }
 
 impl NewsCollector {
-    pub fn new(sources: &SourcesConfig) -> Self {
-        let client = match Client::builder()
-            .timeout(std::time::Duration::from_secs(10))
-            .build()
-        {
-            Ok(c) => c,
+    pub fn new(sources: &SourcesConfig, proxy_url: Option<&str>) -> Self {
+        let mut client_builder = Client::builder().timeout(std::time::Duration::from_secs(10));
+        if let Some(proxy_url) = proxy_url {
+            if let Ok(proxy) = reqwest::Proxy::all(proxy_url) {
+                client_builder = client_builder.proxy(proxy);
+            }
+        }
+        let client = match client_builder.build() {
+            Ok(client) => client,
             Err(e) => {
-                warn!("Failed to build HTTP client with timeout, fallback to default client: {}", e);
+                warn!(
+                    "Failed to build HTTP client with timeout, fallback to default client: {}",
+                    e
+                );
                 Client::new()
             }
         };
@@ -62,10 +68,8 @@ impl NewsCollector {
 
     pub async fn fetch(&self) -> Result<Vec<crate::collector::NewsItem>> {
         info!("Fetching news from {} sources...", self.source_count());
-        
+
         let mut all_news = Vec::new();
-        
-        // 从新闻 API 获取
         for api_config in &self.sources.news_apis {
             match self.fetch_from_api(api_config).await {
                 Ok(mut news) => {
@@ -77,104 +81,91 @@ impl NewsCollector {
                 }
             }
         }
-        
-        // 如果没有真实新闻，返回模拟数据作为 fallback
+
         if all_news.is_empty() {
-            warn!("No real news fetched, using mock data as fallback");
-            all_news = self.mock_news();
+            warn!("No actionable real news fetched from configured sources");
         }
-        
+
         info!("Total news items collected: {}", all_news.len());
         Ok(all_news)
     }
-    
-    async fn fetch_from_api(&self, api_config: &crate::config::NewsApiConfig) -> Result<Vec<crate::collector::NewsItem>> {
+
+    async fn fetch_from_api(
+        &self,
+        api_config: &crate::config::NewsApiConfig,
+    ) -> Result<Vec<crate::collector::NewsItem>> {
         let url = &api_config.url;
-        
         debug!("Fetching news from API: {}", url);
-        
-        let response = self.client
+
+        let response = self
+            .client
             .get(url)
             .header("Authorization", format!("Bearer {}", api_config.token))
             .send()
             .await
             .context("Failed to send request to news API")?;
-            
+
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
             anyhow::bail!("News API error {}: {}", status, body);
         }
-        
-        let api_response: NewsApiResponse = response.json().await
+
+        let api_response: NewsApiResponse = response
+            .json()
+            .await
             .context("Failed to parse news API response")?;
-            
+
         let mut news_items = Vec::new();
         for article in api_response.articles {
-            // 检查是否包含关键词
-            let content = format!("{} {} {}", 
-                article.title, 
+            let content = format!(
+                "{} {} {}",
+                article.title,
                 article.description.as_deref().unwrap_or(""),
                 article.url.as_deref().unwrap_or("")
             );
-            
+
             if self.contains_keywords(&content) {
-                let timestamp = parse_published_at(article.published_at.as_deref()).unwrap_or_else(now_ts);
-                
+                let timestamp =
+                    parse_published_at(article.published_at.as_deref()).unwrap_or_else(now_ts);
+
                 news_items.push(crate::collector::NewsItem {
                     source: article.source.unwrap_or_else(|| api_config.name.clone()),
                     title: article.title,
-                    content: article.description.unwrap_or_default(),
+                    content: content.clone(),
                     timestamp,
                     market: self.extract_market(&content),
                 });
             }
         }
-        
+
         Ok(news_items)
     }
-    
+
     fn contains_keywords(&self, text: &str) -> bool {
         let text_lower = text.to_lowercase();
-        self.sources.keywords.iter()
+        self.sources
+            .keywords
+            .iter()
             .any(|keyword| text_lower.contains(&keyword.to_lowercase()))
     }
-    
+
     fn extract_market(&self, text: &str) -> Option<String> {
-        // 简单的市场提取逻辑：查找包含 "election", "market", "outcome" 等关键词的新闻
-        if text.to_lowercase().contains("election") || 
-           text.to_lowercase().contains("market") || 
-           text.to_lowercase().contains("outcome") {
-            Some("general_market".to_string())
-        } else {
-            None
-        }
+        extract_token_id(text)
     }
-    
-    fn mock_news(&self) -> Vec<crate::collector::NewsItem> {
-        vec![
-            crate::collector::NewsItem {
-                source: "Mock Source".to_string(),
-                title: "Election Results Show Tight Race".to_string(),
-                content: "Latest polls indicate a very close election outcome".to_string(),
-                timestamp: SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs(),
-                market: Some("election_market".to_string()),
-            },
-            crate::collector::NewsItem {
-                source: "Mock Source".to_string(),
-                title: "Market Analysis Report".to_string(),
-                content: "Financial markets show increased volatility".to_string(),
-                timestamp: SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs(),
-                market: Some("financial_market".to_string()),
-            },
-        ]
+}
+
+fn extract_token_id(text: &str) -> Option<String> {
+    let hex = Regex::new(r"0x[a-fA-F0-9]{64}").expect("hex token id regex should compile");
+    if let Some(matched) = hex.find(text) {
+        return Some(matched.as_str().to_ascii_lowercase());
     }
+
+    let keyed_decimal = Regex::new(r"(?i)(?:asset_id|token_id|market_id)[=: /]+([0-9]{10,})")
+        .expect("decimal token id regex should compile");
+    keyed_decimal
+        .captures(text)
+        .and_then(|captures| captures.get(1).map(|value| value.as_str().to_string()))
 }
 
 fn now_ts() -> u64 {
@@ -201,7 +192,7 @@ fn parse_published_at(input: Option<&str>) -> Option<u64> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_published_at;
+    use super::{extract_token_id, parse_published_at};
 
     #[test]
     fn test_parse_published_at_unix() {
@@ -221,5 +212,27 @@ mod tests {
         assert_eq!(parse_published_at(Some("not-a-date")), None);
         assert_eq!(parse_published_at(Some("   ")), None);
         assert_eq!(parse_published_at(None), None);
+    }
+
+    #[test]
+    fn test_extract_hex_token_id() {
+        let token = extract_token_id(
+            "Breaking: market token 0x00000000000000000000000000000000000000000000000000000000000000aa surged",
+        );
+        assert_eq!(
+            token.as_deref(),
+            Some("0x00000000000000000000000000000000000000000000000000000000000000aa")
+        );
+    }
+
+    #[test]
+    fn test_extract_keyed_decimal_token_id() {
+        let token = extract_token_id("asset_id=12345678901234567890");
+        assert_eq!(token.as_deref(), Some("12345678901234567890"));
+    }
+
+    #[test]
+    fn test_extract_token_id_requires_token_pattern() {
+        assert_eq!(extract_token_id("general market discussion"), None);
     }
 }

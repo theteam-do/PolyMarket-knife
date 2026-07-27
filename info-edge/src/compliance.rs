@@ -72,7 +72,6 @@ mod tests {
             direction: Direction::Yes,
             confidence: 0.85,
             expected_return: 0.50,
-            news_title: "Test news".to_string(),
         }
     }
 

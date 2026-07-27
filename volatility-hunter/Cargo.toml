@@ -24,4 +24,7 @@ config.workspace = true
 tokio-tungstenite.workspace = true
 futures-util.workspace = true
 common = { version = "0.1.0", path = "../common" }
+secrecy = { workspace = true }
 reqwest.workspace = true
+alloy.workspace = true
+uuid.workspace = true

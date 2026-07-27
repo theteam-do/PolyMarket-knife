@@ -10,7 +10,6 @@ pub struct Signal {
     pub direction: Direction,
     pub confidence: f64,
     pub expected_return: f64,
-    pub news_title: String,
 }
 
 pub struct SignalGenerator {
@@ -50,7 +49,6 @@ impl SignalGenerator {
             direction: sentiment.direction,
             confidence: sentiment.confidence,
             expected_return,
-            news_title: item.title.clone(),
         })
     }
 

@@ -24,3 +24,7 @@ rust_decimal.workspace = true
 rust_decimal_macros.workspace = true
 config.workspace = true
 polymarket-client-sdk.workspace = true
+alloy.workspace = true
+uuid.workspace = true
+common = { version = "0.1.0", path = "../common" }
+secrecy = { workspace = true }

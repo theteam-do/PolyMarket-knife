@@ -1,6 +1,9 @@
 use anyhow::Result;
+use secrecy::ExposeSecret;
 use serde::Deserialize;
 use std::path::Path;
+
+use common::{ClobConfig, PolygonConfig};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
@@ -12,28 +15,9 @@ pub struct Config {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct PolygonConfig {
-    pub rpc_url: String,
-    #[serde(skip)]
-    pub private_key: String,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct ClobConfig {
-    pub host: String,
-    pub ws_market_url: Option<String>,
-    pub ws_user_url: Option<String>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
 pub struct SourcesConfig {
-    /// 新闻源 API 列表
     pub news_apis: Vec<NewsApiConfig>,
-
-    /// 监控关键词
     pub keywords: Vec<String>,
-
-    /// 政府网站监控列表
     pub gov_websites: Vec<String>,
 }
 
@@ -46,29 +30,40 @@ pub struct NewsApiConfig {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct StrategyConfig {
-    /// 置信度阈值
     pub confidence_threshold: f64,
-
-    /// 最大仓位 (美元)
     pub max_position_usd: f64,
-
-    /// 最小预期收益 (0.3 = 30%)
     pub min_expected_return: f64,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct RiskConfig {
-    /// 日最大亏损 (美元)
     pub max_daily_loss: f64,
-
-    /// 是否需要法律审查 ⚠️
     pub legal_review_required: bool,
 }
 
 impl Config {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let content = std::fs::read_to_string(path)?;
-        let config: Config = toml::from_str(&content)?;
+        let mut config: Config = toml::from_str(&content)?;
+        if config.polygon.private_key.expose_secret().is_empty() {
+            config.polygon.private_key = std::env::var("POLYMARKET_PRIVATE_KEY")
+                .unwrap_or_default()
+                .trim()
+                .to_string()
+                .into();
+        }
+        if config.clob.api_key.is_none() {
+            config.clob.api_key = std::env::var("CLOB_API_KEY").ok();
+        }
+        if config.clob.api_secret.is_none() {
+            config.clob.api_secret = std::env::var("CLOB_API_SECRET").ok();
+        }
+        if config.clob.passphrase.is_none() {
+            config.clob.passphrase = std::env::var("CLOB_PASSPHRASE").ok();
+        }
+        if config.clob.proxy_url.is_none() {
+            config.clob.proxy_url = std::env::var("CLOB_PROXY_URL").ok();
+        }
         Ok(config)
     }
 }

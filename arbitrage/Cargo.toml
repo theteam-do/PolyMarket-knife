@@ -19,11 +19,13 @@ thiserror.workspace = true
 anyhow.workspace = true
 rust_decimal.workspace = true
 rust_decimal_macros.workspace = true
-polymarket-client-sdk = { workspace = true, features = ["ws", "tracing"] }
+polymarket-client-sdk = { workspace = true, features = ["ws", "tracing", "ctf"] }
 config.workspace = true
 reqwest.workspace = true
 common = { version = "0.1.0", path = "../common" }
+secrecy = { workspace = true }
 futures-util.workspace = true
 tokio-tungstenite = { workspace = true, features = ["native-tls"] }
 futures = "0.3"
-alloy.workspace = true
+alloy = { workspace = true, features = ["providers"] }
+uuid.workspace = true

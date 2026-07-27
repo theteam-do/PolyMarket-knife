@@ -22,12 +22,17 @@ struct GammaMarket {
 impl TargetScanner {
     pub fn new(config: &StrategyConfig, api: &ApiConfig) -> Self {
         let client = match Client::builder()
-            .timeout(std::time::Duration::from_millis(api.http_timeout_ms.max(100)))
+            .timeout(std::time::Duration::from_millis(
+                api.http_timeout_ms.max(100),
+            ))
             .build()
         {
             Ok(c) => c,
             Err(e) => {
-                warn!("Failed to build HTTP client with timeout, fallback to default client: {}", e);
+                warn!(
+                    "Failed to build HTTP client with timeout, fallback to default client: {}",
+                    e
+                );
                 Client::new()
             }
         };
@@ -41,10 +46,10 @@ impl TargetScanner {
 
     pub async fn scan(&self) -> Result<Vec<TargetMarket>> {
         info!("Scanning for target markets...");
-        
+
         // 获取 Polymarket 市场列表
         let markets = self.fetch_polymarket_markets().await?;
-        
+
         // 过滤目标市场
         let mut targets = Vec::new();
         for market in markets {
@@ -63,10 +68,11 @@ impl TargetScanner {
 
     async fn fetch_polymarket_markets(&self) -> Result<Vec<GammaMarket>> {
         let url = &self.api.gamma_markets_url;
-        
+
         debug!("Fetching markets from: {}", url);
-        
-        let response = self.client
+
+        let response = self
+            .client
             .get(url)
             .send()
             .await
@@ -78,7 +84,9 @@ impl TargetScanner {
             anyhow::bail!("Gamma API error {}: {}", status, body);
         }
 
-        let markets: Vec<GammaMarket> = response.json().await
+        let markets: Vec<GammaMarket> = response
+            .json()
+            .await
             .context("Failed to parse markets response")?;
 
         debug!("Fetched {} markets from Gamma API", markets.len());
@@ -96,7 +104,10 @@ impl TargetScanner {
         };
 
         if volume < self.config.min_liquidity_usd {
-            debug!("Market {} filtered: insufficient liquidity ${:.2}", market.id, volume);
+            debug!(
+                "Market {} filtered: insufficient liquidity ${:.2}",
+                market.id, volume
+            );
             return false;
         }
 
@@ -107,7 +118,12 @@ impl TargetScanner {
         }
 
         // 检查是否在排除列表中
-        if self.config.exclude_addresses.iter().any(|addr| market.id.contains(addr)) {
+        if self
+            .config
+            .exclude_addresses
+            .iter()
+            .any(|addr| market.id.contains(addr))
+        {
             debug!("Market {} filtered: in exclude list", market.id);
             return false;
         }

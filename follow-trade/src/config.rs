@@ -1,10 +1,11 @@
 //! 跟单策略配置
 
 use anyhow::Result;
+use secrecy::ExposeSecret;
 use serde::Deserialize;
 use std::path::Path;
 
-pub use common::{ExecutionConfig, ExecutionMode};
+pub use common::{ClobConfig, ExecutionConfig, ExecutionMode, PolygonConfig};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
@@ -13,23 +14,6 @@ pub struct Config {
     pub strategy: StrategyConfig,
     #[serde(default)]
     pub execution: ExecutionConfig,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct PolygonConfig {
-    pub rpc_url: String,
-    pub ws_rpc_url: Option<String>,
-    #[serde(default)]
-    pub private_key: String,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct ClobConfig {
-    pub host: String,
-    pub ws_market_url: Option<String>,
-    pub ws_user_url: Option<String>,
-    pub api_key: Option<String>,
-    pub api_secret: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -48,9 +32,16 @@ impl Config {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let content = std::fs::read_to_string(path)?;
         let mut config: Config = toml::from_str(&content)?;
-        if config.polygon.private_key.is_empty() {
-            config.polygon.private_key =
-                std::env::var("POLYMARKET_PRIVATE_KEY").unwrap_or_default();
+        if config.polygon.private_key.expose_secret().is_empty() {
+            config.polygon.private_key = std::env::var("POLYMARKET_PRIVATE_KEY")
+                .unwrap_or_default()
+                .into();
+        }
+        if config.clob.passphrase.is_none() {
+            config.clob.passphrase = std::env::var("CLOB_PASSPHRASE").ok();
+        }
+        if config.clob.proxy_url.is_none() {
+            config.clob.proxy_url = std::env::var("CLOB_PROXY_URL").ok();
         }
         config.execution.enforce_safety()?;
         Ok(config)

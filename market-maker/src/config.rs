@@ -1,10 +1,11 @@
 //! 配置模块 - 生产级配置管理
 
 use anyhow::{Context, Result};
+use common::{ClobConfig, PolygonConfig};
+use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
 use std::path::Path;
 
-/// 主配置
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub polygon: PolygonConfig,
@@ -13,26 +14,25 @@ pub struct Config {
     pub risk: RiskConfig,
 }
 
-/// Polygon 配置
-#[derive(Debug, Deserialize, Clone)]
-pub struct PolygonConfig {
-    pub rpc_url: String,
-    #[serde(default)]
-    pub private_key: String,
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum SideMode {
+    #[default]
+    TwoSided,
+    BuyOnly,
+    SellOnly,
 }
 
-/// CLOB 配置
-#[derive(Debug, Deserialize, Clone)]
-pub struct ClobConfig {
-    pub host: String,
-    pub ws_market_url: Option<String>,
-    pub ws_user_url: Option<String>,
-    pub api_key: Option<String>,
-    pub api_secret: Option<String>,
-    pub passphrase: Option<String>,
+impl SideMode {
+    pub fn allows_buy(self) -> bool {
+        matches!(self, Self::TwoSided | Self::BuyOnly)
+    }
+
+    pub fn allows_sell(self) -> bool {
+        matches!(self, Self::TwoSided | Self::SellOnly)
+    }
 }
 
-/// 策略配置
 #[derive(Debug, Deserialize, Clone)]
 pub struct StrategyConfig {
     pub market_ids: Vec<String>,
@@ -42,9 +42,17 @@ pub struct StrategyConfig {
     pub skew_inventory: bool,
     pub min_spread_bps: u32,
     pub max_spread_bps: u32,
+    #[serde(default)]
+    pub side_mode: SideMode,
+    /// Metrics HTTP server bind address (default: 127.0.0.1:9090)
+    #[serde(default = "default_metrics_addr")]
+    pub metrics_bind_addr: String,
 }
 
-/// 风控配置
+fn default_metrics_addr() -> String {
+    "127.0.0.1:9090".to_string()
+}
+
 #[derive(Debug, Deserialize, Clone)]
 pub struct RiskConfig {
     pub max_position_usd: f64,
@@ -52,10 +60,16 @@ pub struct RiskConfig {
     pub stop_loss_pct: f64,
     pub max_orders: usize,
     pub max_order_size_usd: f64,
+    /// Per-market position concentration limit as fraction of max_position_usd (default: 0.3)
+    #[serde(default = "default_concentration_pct")]
+    pub max_market_concentration_pct: f64,
+}
+
+fn default_concentration_pct() -> f64 {
+    0.3
 }
 
 impl Config {
-    /// 从文件加载配置
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let content =
             std::fs::read_to_string(path).with_context(|| "Failed to read config file")?;
@@ -63,26 +77,28 @@ impl Config {
         let mut config: Config =
             toml::from_str(&content).with_context(|| "Failed to parse config file")?;
 
-        if config.polygon.private_key.is_empty() {
-            config.polygon.private_key = std::env::var("POLYMARKET_PRIVATE_KEY")
-                .unwrap_or_default()
-                .trim()
-                .to_string();
+        if config.polygon.private_key.expose_secret().is_empty() {
+            config.polygon.private_key = SecretString::from(
+                std::env::var("POLYMARKET_PRIVATE_KEY")
+                    .unwrap_or_default()
+                    .trim()
+                    .to_string(),
+            );
         }
 
-        // 验证配置
         config.validate()?;
-
         Ok(config)
     }
 
-    /// 从环境变量加载配置
     pub fn from_env() -> Result<Self> {
         Ok(Self {
             polygon: PolygonConfig {
                 rpc_url: std::env::var("POLYGON_RPC_URL")
                     .unwrap_or_else(|_| "https://polygon-bor-rpc.publicnode.com".to_string()),
-                private_key: std::env::var("POLYMARKET_PRIVATE_KEY").unwrap_or_default(),
+                ws_rpc_url: None,
+                private_key: SecretString::from(
+                    std::env::var("POLYMARKET_PRIVATE_KEY").unwrap_or_default(),
+                ),
             },
             clob: ClobConfig {
                 host: std::env::var("CLOB_HOST")
@@ -92,6 +108,7 @@ impl Config {
                 api_key: std::env::var("CLOB_API_KEY").ok(),
                 api_secret: std::env::var("CLOB_API_SECRET").ok(),
                 passphrase: std::env::var("CLOB_PASSPHRASE").ok(),
+                proxy_url: std::env::var("CLOB_PROXY_URL").ok(),
             },
             strategy: StrategyConfig {
                 market_ids: vec![],
@@ -101,6 +118,8 @@ impl Config {
                 skew_inventory: true,
                 min_spread_bps: 50,
                 max_spread_bps: 500,
+                side_mode: SideMode::TwoSided,
+                metrics_bind_addr: default_metrics_addr(),
             },
             risk: RiskConfig {
                 max_position_usd: 10000.0,
@@ -108,20 +127,18 @@ impl Config {
                 stop_loss_pct: 5.0,
                 max_orders: 10,
                 max_order_size_usd: 5000.0,
+                max_market_concentration_pct: default_concentration_pct(),
             },
         })
     }
 
-    /// 验证配置
     fn validate(&self) -> Result<()> {
-        // 验证私钥
-        if self.polygon.private_key.is_empty() {
+        if self.polygon.private_key.expose_secret().is_empty() {
             anyhow::bail!(
                 "Private key is required. Set POLYMARKET_PRIVATE_KEY environment variable"
             );
         }
 
-        // 验证价差
         if self.strategy.spread_bps < self.strategy.min_spread_bps {
             anyhow::bail!("spread_bps cannot be less than min_spread_bps");
         }
@@ -130,7 +147,6 @@ impl Config {
             anyhow::bail!("spread_bps cannot be greater than max_spread_bps");
         }
 
-        // 验证风控
         if self.risk.max_loss_per_day <= 0.0 {
             anyhow::bail!("max_loss_per_day must be positive");
         }
@@ -145,7 +161,8 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
-    use super::Config;
+    use secrecy::ExposeSecret;
+    use super::{Config, SideMode};
     use std::fs;
     use std::sync::Mutex;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -184,6 +201,7 @@ private_key = "0xabc"
 
 [clob]
 host = "https://clob.polymarket.com"
+proxy_url = "socks5h://127.0.0.1:7890"
 
 [strategy]
 market_ids = ["1"]
@@ -193,6 +211,7 @@ refresh_interval_ms = 100
 skew_inventory = true
 min_spread_bps = 50
 max_spread_bps = 200
+side_mode = "buy_only"
 
 [risk]
 max_position_usd = 1000.0
@@ -204,7 +223,10 @@ max_order_size_usd = 500.0
         );
 
         let cfg = Config::load(&path).expect("config should load");
-        assert_eq!(cfg.polygon.private_key, "0xabc");
+        assert_eq!(cfg.polygon.private_key.expose_secret(), "0xabc");
+        assert_eq!(cfg.strategy.side_mode, SideMode::BuyOnly);
+        assert_eq!(cfg.strategy.metrics_bind_addr, "127.0.0.1:9090");
+        assert!((cfg.risk.max_market_concentration_pct - 0.3).abs() < 1e-6);
 
         let _ = fs::remove_file(path);
         restore_env(original_env);
@@ -243,7 +265,8 @@ max_order_size_usd = 500.0
         );
 
         let cfg = Config::load(&path).expect("config should load");
-        assert_eq!(cfg.polygon.private_key, "0xenv");
+        assert_eq!(cfg.polygon.private_key.expose_secret(), "0xenv");
+        assert_eq!(cfg.strategy.side_mode, SideMode::TwoSided);
 
         let _ = fs::remove_file(path);
         restore_env(original_env);

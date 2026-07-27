@@ -1,6 +1,7 @@
 //! 监控指标
 
 use prometheus::{Counter, Encoder, Gauge, Histogram, Registry, TextEncoder};
+use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use std::time::Instant;
@@ -127,7 +128,7 @@ impl Metrics {
     }
 
     pub fn record_pnl(&self, pnl: Decimal) {
-        let pnl_f64 = pnl.to_string().parse::<f64>().unwrap_or(0.0);
+        let pnl_f64 = pnl.to_f64().unwrap_or(0.0);
         self.daily_pnl.set(pnl_f64);
         self.total_pnl.inc_by(pnl_f64.abs());
         if pnl < dec!(0) {

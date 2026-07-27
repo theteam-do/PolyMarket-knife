@@ -2,6 +2,8 @@ use anyhow::Result;
 use serde::Deserialize;
 use std::path::Path;
 
+pub use common::{ClobConfig, PolygonConfig};
+
 #[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub polygon: PolygonConfig,
@@ -12,20 +14,6 @@ pub struct Config {
     #[serde(default)]
     pub monitor: MonitorConfig,
     pub warning: WarningConfig,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct PolygonConfig {
-    pub rpc_url: String,
-    #[serde(skip)]
-    pub private_key: String,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct ClobConfig {
-    pub host: String,
-    pub ws_market_url: Option<String>,
-    pub ws_user_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

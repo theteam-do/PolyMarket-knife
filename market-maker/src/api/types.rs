@@ -32,7 +32,6 @@ pub struct OrderRequest {
     pub order_type: OrderType,
     pub expiration: u64,
     pub nonce: u64,
-    pub signer: String,
 }
 
 /// 订单响应

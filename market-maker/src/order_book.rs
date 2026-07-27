@@ -1,7 +1,5 @@
 //! 订单簿模块
 
-use polymarket_client_sdk::types::Decimal;
-
 #[derive(Debug, Clone)]
 pub struct Level {
     pub price: f64,
@@ -38,10 +36,6 @@ impl OrderBook {
             (Some(bid), Some(ask)) => Some((bid + ask) / 2.0),
             _ => None,
         }
-    }
-
-    pub fn mid_price_decimal(&self) -> Option<Decimal> {
-        self.mid_price().and_then(Decimal::from_f64_retain)
     }
 
     pub fn spread(&self) -> Option<f64> {

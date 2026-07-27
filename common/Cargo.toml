@@ -11,5 +11,12 @@ categories = ["development-tools", "finance"]
 
 [dependencies]
 serde = { workspace = true }
+secrecy = { workspace = true }
 anyhow = { workspace = true }
 toml = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
+studio-shared = { path = "../polymarket-studio/crates/studio-shared" }

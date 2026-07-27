@@ -20,3 +20,5 @@ rust_decimal.workspace = true
 config.workspace = true
 reqwest.workspace = true
 chrono.workspace = true
+common = { version = "0.1.0", path = "../common" }
+secrecy = { workspace = true }

@@ -29,23 +29,24 @@ impl MetricsCollector {
         }
     }
 
-    pub fn record_order(&self, status: OrderStatus) {
-        self.orders_placed.fetch_add(1, Ordering::Relaxed);
+    pub fn record_placed(&self, count: u64) {
+        self.orders_placed.fetch_add(count, Ordering::Relaxed);
+        self.touch();
+    }
 
-        match status {
-            OrderStatus::Filled => {
-                self.orders_filled.fetch_add(1, Ordering::Relaxed);
-            }
-            OrderStatus::Cancelled => {
-                self.orders_cancelled.fetch_add(1, Ordering::Relaxed);
-            }
-            OrderStatus::Failed => {
-                self.orders_failed.fetch_add(1, Ordering::Relaxed);
-            }
-        }
+    pub fn record_filled(&self, count: u64) {
+        self.orders_filled.fetch_add(count, Ordering::Relaxed);
+        self.touch();
+    }
 
-        self.last_update
-            .store(current_timestamp(), Ordering::Relaxed);
+    pub fn record_cancelled(&self, count: u64) {
+        self.orders_cancelled.fetch_add(count, Ordering::Relaxed);
+        self.touch();
+    }
+
+    pub fn record_failed(&self, count: u64) {
+        self.orders_failed.fetch_add(count, Ordering::Relaxed);
+        self.touch();
     }
 
     pub fn record_pnl(&self, pnl: Decimal) {
@@ -57,8 +58,7 @@ impl MetricsCollector {
                 0
             });
         self.daily_pnl.fetch_add(pnl_cents, Ordering::Relaxed);
-        self.last_update
-            .store(current_timestamp(), Ordering::Relaxed);
+        self.touch();
     }
 
     pub fn record_volume(&self, volume: Decimal) {
@@ -70,8 +70,7 @@ impl MetricsCollector {
                 0
             });
         self.daily_volume.fetch_add(volume_cents, Ordering::Relaxed);
-        self.last_update
-            .store(current_timestamp(), Ordering::Relaxed);
+        self.touch();
     }
 
     pub fn export_prometheus(&self) -> String {
@@ -126,6 +125,10 @@ market_maker_last_update {} {}
     pub fn reset_daily(&self) {
         self.daily_pnl.store(0, Ordering::Relaxed);
         self.daily_volume.store(0, Ordering::Relaxed);
+        self.touch();
+    }
+
+    fn touch(&self) {
         self.last_update
             .store(current_timestamp(), Ordering::Relaxed);
     }
@@ -135,13 +138,6 @@ impl Default for MetricsCollector {
     fn default() -> Self {
         Self::new()
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum OrderStatus {
-    Filled,
-    Cancelled,
-    Failed,
 }
 
 fn current_timestamp() -> u64 {
@@ -157,16 +153,18 @@ mod tests {
     use rust_decimal_macros::dec;
 
     #[test]
-    fn test_record_order() {
+    fn test_record_order_counters() {
         let collector = MetricsCollector::new();
 
-        collector.record_order(OrderStatus::Filled);
-        collector.record_order(OrderStatus::Filled);
-        collector.record_order(OrderStatus::Failed);
+        collector.record_placed(2);
+        collector.record_cancelled(1);
+        collector.record_failed(1);
+        collector.record_filled(1);
 
-        assert_eq!(collector.orders_placed.load(Ordering::Relaxed), 3);
-        assert_eq!(collector.orders_filled.load(Ordering::Relaxed), 2);
+        assert_eq!(collector.orders_placed.load(Ordering::Relaxed), 2);
+        assert_eq!(collector.orders_cancelled.load(Ordering::Relaxed), 1);
         assert_eq!(collector.orders_failed.load(Ordering::Relaxed), 1);
+        assert_eq!(collector.orders_filled.load(Ordering::Relaxed), 1);
     }
 
     #[test]
@@ -176,19 +174,18 @@ mod tests {
         collector.record_pnl(dec!(100.50));
         collector.record_pnl(dec!(-50.25));
 
-        assert_eq!(collector.daily_pnl.load(Ordering::Relaxed) as i64, 5025);
+        assert_eq!(collector.daily_pnl.load(Ordering::Relaxed), 5025);
     }
 
     #[test]
     fn test_export_prometheus() {
         let collector = MetricsCollector::new();
-        collector.record_order(OrderStatus::Filled);
+        collector.record_placed(2);
         collector.record_volume(dec!(12.34));
 
         let output = collector.export_prometheus();
 
-        assert!(output.contains("market_maker_orders_placed 1"));
-        assert!(output.contains("market_maker_orders_filled 1"));
+        assert!(output.contains("market_maker_orders_placed 2"));
         assert!(output.contains("market_maker_daily_volume 1234"));
     }
 

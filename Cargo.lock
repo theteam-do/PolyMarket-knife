@@ -715,6 +715,7 @@ dependencies = [
  "reqwest 0.12.28",
  "rust_decimal",
  "rust_decimal_macros",
+ "secrecy",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -723,6 +724,7 @@ dependencies = [
  "toml 0.8.23",
  "tracing",
  "tracing-subscriber",
+ "uuid 1.21.0",
 ]
 
 [[package]]
@@ -1959,8 +1961,15 @@ name = "common"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "reqwest 0.12.28",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "secrecy",
  "serde",
+ "studio-shared",
+ "tokio",
  "toml 0.8.23",
+ "tracing",
 ]
 
 [[package]]
@@ -3133,6 +3142,7 @@ dependencies = [
  "reqwest 0.12.28",
  "rust_decimal",
  "rust_decimal_macros",
+ "secrecy",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -3140,6 +3150,7 @@ dependencies = [
  "toml 0.8.23",
  "tracing",
  "tracing-subscriber",
+ "uuid 1.21.0",
 ]
 
 [[package]]
@@ -4002,14 +4013,17 @@ dependencies = [
 name = "info-edge"
 version = "0.1.0"
 dependencies = [
+ "alloy",
  "anyhow",
  "chrono",
+ "common",
  "config",
  "polymarket-client-sdk",
  "regex",
  "reqwest 0.12.28",
  "rust_decimal",
  "rust_decimal_macros",
+ "secrecy",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -4017,6 +4031,7 @@ dependencies = [
  "toml 0.8.23",
  "tracing",
  "tracing-subscriber",
+ "uuid 1.21.0",
 ]
 
 [[package]]
@@ -4330,13 +4345,17 @@ dependencies = [
  "alloy",
  "anyhow",
  "chrono",
+ "common",
  "config",
  "criterion 0.5.1",
+ "futures-util",
  "mockall",
+ "monitor",
  "polymarket-client-sdk",
  "reqwest 0.12.28",
  "rust_decimal",
  "rust_decimal_macros",
+ "secrecy",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -4344,6 +4363,7 @@ dependencies = [
  "toml 0.8.23",
  "tracing",
  "tracing-subscriber",
+ "uuid 1.21.0",
 ]
 
 [[package]]
@@ -4648,9 +4668,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "common",
  "config",
  "reqwest 0.12.28",
  "rust_decimal",
+ "secrecy",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -5079,6 +5101,7 @@ dependencies = [
  "sha2",
  "strum_macros 0.28.0",
  "tokio",
+ "tokio-socks",
  "tokio-tungstenite 0.28.0",
  "tokio-util",
  "tracing",
@@ -6712,6 +6735,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "studio-shared"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7079,6 +7109,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1729aa945f29d91ba541258c8df89027d5792d85a8841fb65e8bf0f4ede4ef61"
 dependencies = [
  "rustls 0.23.37",
+ "tokio",
+]
+
+[[package]]
+name = "tokio-socks"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d4770b8024672c1101b3f6733eab95b18007dbe0847a8afe341fcf79e06043f"
+dependencies = [
+ "either",
+ "futures-util",
+ "thiserror 1.0.69",
  "tokio",
 ]
 
@@ -7576,6 +7618,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 name = "volatility-hunter"
 version = "0.1.0"
 dependencies = [
+ "alloy",
  "anyhow",
  "common",
  "config",
@@ -7584,6 +7627,7 @@ dependencies = [
  "reqwest 0.12.28",
  "rust_decimal",
  "rust_decimal_macros",
+ "secrecy",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -7592,6 +7636,7 @@ dependencies = [
  "toml 0.8.23",
  "tracing",
  "tracing-subscriber",
+ "uuid 1.21.0",
 ]
 
 [[package]]

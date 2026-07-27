@@ -33,7 +33,10 @@ impl OrderbookMonitor {
         {
             Ok(c) => c,
             Err(e) => {
-                warn!("Failed to build HTTP client with timeout, fallback to default client: {}", e);
+                warn!(
+                    "Failed to build HTTP client with timeout, fallback to default client: {}",
+                    e
+                );
                 Client::new()
             }
         };
@@ -46,17 +49,20 @@ impl OrderbookMonitor {
 
     pub async fn wait_for_clearing(&self, market: &str) -> bool {
         info!("Monitoring orderbook clearing for market: {}", market);
-        
+
         let start = Instant::now();
         let timeout = Duration::from_secs(self.config.monitor.clearing_timeout_seconds.max(1));
         let poll_interval = Duration::from_millis(self.config.monitor.poll_interval_ms.max(50));
-        
+
         loop {
             if start.elapsed() > timeout {
-                warn!("Timeout waiting for orderbook clearing in market {}", market);
+                warn!(
+                    "Timeout waiting for orderbook clearing in market {}",
+                    market
+                );
                 return false;
             }
-            
+
             match self.check_orderbook_clear(market).await {
                 Ok(cleared) => {
                     if cleared {
@@ -68,11 +74,11 @@ impl OrderbookMonitor {
                     warn!("Failed to check orderbook for market {}: {}", market, e);
                 }
             }
-            
+
             tokio::time::sleep(poll_interval).await;
         }
     }
-    
+
     async fn check_orderbook_clear(&self, market: &str) -> Result<bool> {
         // 构造 CLOB API URL
         let base = self.config.clob.host.trim_end_matches('/');
@@ -82,24 +88,27 @@ impl OrderbookMonitor {
             "/book"
         };
         let url = format!("{}{}?token_id={}", base, path, market);
-        
+
         debug!("Checking orderbook: {}", url);
-        
-        let response = self.client
+
+        let response = self
+            .client
             .get(&url)
             .send()
             .await
             .context("Failed to fetch orderbook")?;
-            
+
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
             anyhow::bail!("Orderbook API error {}: {}", status, body);
         }
-        
-        let orderbook: OrderBookResponse = response.json().await
+
+        let orderbook: OrderBookResponse = response
+            .json()
+            .await
             .context("Failed to parse orderbook response")?;
-            
+
         let best_bid = orderbook
             .bids
             .first()
@@ -118,25 +127,42 @@ impl OrderbookMonitor {
             best_bid,
             best_ask
         );
-        
+
         // 检查订单簿是否基本清空（少于3个层级或总深度很小）
-        let total_bids: f64 = orderbook.bids.iter()
+        let total_bids: f64 = orderbook
+            .bids
+            .iter()
             .filter_map(|level| level.size.parse::<f64>().ok())
             .sum();
-            
-        let total_asks: f64 = orderbook.asks.iter()
+
+        let total_asks: f64 = orderbook
+            .asks
+            .iter()
             .filter_map(|level| level.size.parse::<f64>().ok())
             .sum();
-            
-        let is_cleared = self.is_cleared(orderbook.bids.len(), orderbook.asks.len(), total_bids, total_asks);
-                        
-        debug!("Market {} cleared: {} (bids: {}, asks: {})", 
-            market, is_cleared, total_bids, total_asks);
-            
+
+        let is_cleared = self.is_cleared(
+            orderbook.bids.len(),
+            orderbook.asks.len(),
+            total_bids,
+            total_asks,
+        );
+
+        debug!(
+            "Market {} cleared: {} (bids: {}, asks: {})",
+            market, is_cleared, total_bids, total_asks
+        );
+
         Ok(is_cleared)
     }
 
-    fn is_cleared(&self, bid_levels: usize, ask_levels: usize, total_bids: f64, total_asks: f64) -> bool {
+    fn is_cleared(
+        &self,
+        bid_levels: usize,
+        ask_levels: usize,
+        total_bids: f64,
+        total_asks: f64,
+    ) -> bool {
         bid_levels <= self.config.monitor.max_levels_per_side
             && ask_levels <= self.config.monitor.max_levels_per_side
             && total_bids < self.config.monitor.max_depth_per_side
@@ -155,12 +181,17 @@ mod tests {
         Config {
             polygon: PolygonConfig {
                 rpc_url: "wss://mumbai-rpc.com".to_string(),
-                private_key: String::new(),
+                ws_rpc_url: None,
+                private_key: secrecy::SecretString::default(),
             },
             clob: ClobConfig {
                 host: "https://clob.polymarket.com".to_string(),
                 ws_market_url: None,
                 ws_user_url: None,
+                api_key: None,
+                api_secret: None,
+                passphrase: None,
+                proxy_url: None,
             },
             strategy: StrategyConfig {
                 attack_gas_limit: 50_000,

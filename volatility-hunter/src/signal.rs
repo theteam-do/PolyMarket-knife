@@ -113,10 +113,16 @@ impl SignalGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::SymbolMarketConfig;
 
     fn create_test_generator() -> SignalGenerator {
         let config = StrategyConfig {
             symbols: vec!["BTCUSDT".to_string()],
+            symbol_markets: vec![SymbolMarketConfig {
+                symbol: "BTCUSDT".to_string(),
+                bullish_token_id: "1".to_string(),
+                bearish_token_id: "2".to_string(),
+            }],
             volatility_threshold: 0.02,
             momentum_threshold: 0.01,
             base_position_usd: 100.0,

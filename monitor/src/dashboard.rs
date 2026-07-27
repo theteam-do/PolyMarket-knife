@@ -2,6 +2,7 @@
 
 use crate::alerts::AlertManager;
 use crate::metrics::Metrics;
+use tracing::info;
 
 pub struct Dashboard {
     metrics: Metrics,
@@ -28,16 +29,16 @@ impl Dashboard {
     pub fn print_status(&self) {
         let status = self.get_status();
 
-        println!("\n=== Trading Dashboard ===");
-        println!("Daily PnL:      ${:.2}", status.daily_pnl);
-        println!("Total PnL:      ${:.2}", status.total_pnl);
-        println!(
+        info!("\n=== Trading Dashboard ===");
+        info!("Daily PnL:      ${:.2}", status.daily_pnl);
+        info!("Total PnL:      ${:.2}", status.total_pnl);
+        info!(
             "Orders:         {} placed, {} filled",
             status.orders_placed, status.orders_filled
         );
-        println!("Opportunities:  {}", status.opportunities);
-        println!("Alerts:         {}", status.alerts_count);
-        println!(
+        info!("Opportunities:  {}", status.opportunities);
+        info!("Alerts:         {}", status.alerts_count);
+        info!(
             "Status:         {}",
             if status.should_stop {
                 "STOPPED"
@@ -45,7 +46,7 @@ impl Dashboard {
                 "RUNNING"
             }
         );
-        println!("========================\n");
+        info!("========================\n");
     }
 }
 

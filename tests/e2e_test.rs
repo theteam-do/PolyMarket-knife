@@ -82,6 +82,9 @@ fn test_monitoring_system() {
         .map(|v| v > 100)
         .unwrap_or(false);
 
-    assert!(has_order_metric && has_pnl_metric, "Monitoring should expose core metrics");
+    assert!(
+        has_order_metric && has_pnl_metric,
+        "Monitoring should expose core metrics"
+    );
     assert!(high_latency_alert, "High latency should be alertable");
 }

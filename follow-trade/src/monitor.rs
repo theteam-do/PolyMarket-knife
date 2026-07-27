@@ -47,7 +47,7 @@ impl ChainMonitor {
     }
 
     /// 启动 WebSocket 订阅并将解析的交易发送到 channel
-    /// 
+    ///
     /// 注意：使用 ethers v2 进行链上事件监控，alloy 用于交易签名和提交
     pub async fn stream_trades(&self, tx: mpsc::Sender<TradeEvent>) -> Result<()> {
         let ws_url = self
@@ -58,7 +58,7 @@ impl ChainMonitor {
             .unwrap_or_else(|| "wss://polygon-bor-rpc.publicnode.com".to_string());
 
         info!("Connecting to Polygon WebSocket RPC: {}", ws_url);
-        
+
         // 使用 ethers v2 的 WebSocket 提供者进行事件订阅
         // 这是目前最稳定的链上事件监控方案
         let provider = Provider::<Ws>::connect(&ws_url)
@@ -69,35 +69,48 @@ impl ChainMonitor {
         let exchange_addr = Address::from_str(POLYMARKET_EXCHANGE)?;
         let contract = PolymarketExchange::new(exchange_addr, client.clone());
         let events = contract.order_filled_filter();
-        
+
         let mut stream = events.subscribe().await?;
-        
-        info!("Subscribed to OrderFilled events on Polygon Exchange: {}", POLYMARKET_EXCHANGE);
+
+        info!(
+            "Subscribed to OrderFilled events on Polygon Exchange: {}",
+            POLYMARKET_EXCHANGE
+        );
 
         while let Some(log_result) = stream.next().await {
             match log_result {
                 Ok(event) => {
                     let maker = format!("{:?}", event.maker);
                     let taker = format!("{:?}", event.taker);
-                    
+
                     // 检查是否为智能钱地址
-                    let is_smart_maker = self.config.strategy.smart_addresses.is_empty() 
-                        || self.config.strategy.smart_addresses.iter().any(|a| a.eq_ignore_ascii_case(&maker));
-                        
-                    let is_smart_taker = self.config.strategy.smart_addresses.is_empty() 
-                        || self.config.strategy.smart_addresses.iter().any(|a| a.eq_ignore_ascii_case(&taker));
+                    let is_smart_maker = self.config.strategy.smart_addresses.is_empty()
+                        || self
+                            .config
+                            .strategy
+                            .smart_addresses
+                            .iter()
+                            .any(|a| a.eq_ignore_ascii_case(&maker));
+
+                    let is_smart_taker = self.config.strategy.smart_addresses.is_empty()
+                        || self
+                            .config
+                            .strategy
+                            .smart_addresses
+                            .iter()
+                            .any(|a| a.eq_ignore_ascii_case(&taker));
 
                     if !is_smart_maker && !is_smart_taker {
                         continue;
                     }
-                    
+
                     let smart_wallet = if is_smart_taker { taker } else { maker };
-                    
+
                     // 将 uint256 转换为精确的 Decimal 以防除不尽或精度丢失
                     let maker_amt_u256 = event.maker_amount.as_u128();
                     let taker_amt_u256 = event.taker_amount.as_u128();
                     let fee_amt_u256 = event.fee_amount.as_u128();
-                    
+
                     if maker_amt_u256 == 0 || taker_amt_u256 == 0 {
                         continue;
                     }
@@ -118,7 +131,7 @@ impl ChainMonitor {
                     };
 
                     let price = (usdc_amount / share_amount).round_dp(4); // 通常 Tick Size 为 0.0001
-                    
+
                     // 处理成本：把 feeAmount 加到 size_usd 的逻辑里，计算出带有磨损的成本
                     // Taker 支付 fee，如果 smart_wallet 是 Taker，则将其名义仓位价值减去手续费磨损
                     // 因为在 Polymarket，Fee 是从你得到的资产或者你付出的 USDC 中扣除的。
@@ -136,20 +149,28 @@ impl ChainMonitor {
 
                     // 判断买卖方向
                     // 如果 maker_amt < taker_amt，说明 Maker 付出较少的 USDC，获得较多的 Share，说明 Maker 是买方(Buy)
-                    let maker_side = if maker_amt < taker_amt { Side::Buy } else { Side::Sell };
-                    
+                    let maker_side = if maker_amt < taker_amt {
+                        Side::Buy
+                    } else {
+                        Side::Sell
+                    };
+
                     // Taker 的方向必然与 Maker 相反
-                    let smart_side = if is_smart_taker { 
-                        if maker_side == Side::Buy { Side::Sell } else { Side::Buy }
-                    } else { 
-                        maker_side 
+                    let smart_side = if is_smart_taker {
+                        if maker_side == Side::Buy {
+                            Side::Sell
+                        } else {
+                            Side::Buy
+                        }
+                    } else {
+                        maker_side
                     };
 
                     let timestamp = std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
                         .expect("System time is before UNIX epoch")
                         .as_secs();
-                        
+
                     // 修正 Token ID 格式，Polymarket CLOB API 通常期望 '0x' 前缀的 16 进制 assetId
                     let mut asset_id_hex = format!("{:x}", event.asset_id);
                     // 保证长度即使有零也不被截断，Polymarket assetId 通常是 64 字符
@@ -168,9 +189,14 @@ impl ChainMonitor {
                         timestamp,
                     };
 
-                    info!("Decoded trade: {} {} ${:.2} of asset {} @ ${:.4} (Fee: ${:.4})", 
-                        trade_event.from, 
-                        if trade_event.side == Side::Buy { "BOUGHT" } else { "SOLD" },
+                    info!(
+                        "Decoded trade: {} {} ${:.2} of asset {} @ ${:.4} (Fee: ${:.4})",
+                        trade_event.from,
+                        if trade_event.side == Side::Buy {
+                            "BOUGHT"
+                        } else {
+                            "SOLD"
+                        },
                         trade_event.size_usd,
                         trade_event.market_id,
                         trade_event.price,

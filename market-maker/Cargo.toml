@@ -22,9 +22,13 @@ rust_decimal.workspace = true
 rust_decimal_macros.workspace = true
 chrono.workspace = true
 config.workspace = true
+secrecy.workspace = true
 polymarket-client-sdk.workspace = true
 alloy.workspace = true
+futures-util.workspace = true
+uuid.workspace = true
 monitor = { version = "0.1.0", path = "../monitor" }
+common = { version = "0.1.0", path = "../common" }
 
 [dev-dependencies]
 mockall.workspace = true

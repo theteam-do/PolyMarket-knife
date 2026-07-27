@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use common::{PaperEventKind, PaperRunReporter, RunMode, StrategyKind};
 use rust_decimal::prelude::ToPrimitive;
 use std::sync::Arc;
 use tokio::signal;
@@ -8,39 +9,12 @@ use tracing::{info, warn};
 pub mod config;
 pub mod copier;
 pub mod monitor;
+pub mod risk;
 
-use crate::config::Config;
+use crate::config::{Config, ExecutionMode};
 use crate::copier::TradeCopier;
 use crate::monitor::ChainMonitor;
-
-#[derive(Default)]
-struct RiskManager {
-    daily_pnl: f64,
-    total_exposure: f64,
-}
-
-impl RiskManager {
-    fn can_trade(&self, config: &Config) -> bool {
-        self.daily_pnl >= -config.strategy.max_daily_loss
-            && self.total_exposure <= config.strategy.max_position_per_market
-    }
-
-    fn update_exposure(&mut self, notional: f64) {
-        self.total_exposure += notional;
-    }
-
-    fn update_pnl(&mut self, pnl: f64) {
-        self.daily_pnl += pnl;
-    }
-
-    fn total_position_value(&self) -> f64 {
-        self.total_exposure
-    }
-
-    fn reset_daily(&mut self) {
-        self.daily_pnl = 0.0;
-    }
-}
+use crate::risk::RiskManager;
 
 pub struct Follower {
     config: Config,
@@ -65,9 +39,21 @@ impl Follower {
         self.running = true;
         info!("Starting Follow Trader...");
 
+        let mut reporter = PaperRunReporter::new(
+            StrategyKind::FollowTrade,
+            run_mode(self.config.execution.mode),
+            "Follow Trade",
+            None,
+        );
+        reporter.start(format!(
+            "mode={:?} max_daily_loss={} max_position_per_market={}",
+            self.config.execution.mode,
+            self.config.strategy.max_daily_loss,
+            self.config.strategy.max_position_per_market
+        ));
+
         let (tx, mut rx) = mpsc::channel(100);
 
-        // 启动独立任务监控链上日志
         let monitor_clone = ChainMonitor::new(&self.config);
         tokio::spawn(async move {
             if let Err(e) = monitor_clone.stream_trades(tx).await {
@@ -76,7 +62,7 @@ impl Follower {
         });
 
         let mut trades_copied = 0;
-        let mut total_pnl = 0.0;
+        let mut total_realized_pnl = 0.0;
 
         loop {
             tokio::select! {
@@ -88,42 +74,101 @@ impl Follower {
                 trade_event = rx.recv() => {
                     match trade_event {
                         Some(trade) => {
+                            reporter.update(
+                                PaperEventKind::TradeObserved,
+                                "Smart trade observed",
+                                format!(
+                                    "market={} side={:?} size_usd=${} price={}",
+                                    trade.market_id, trade.side, trade.size_usd, trade.price
+                                ),
+                                None,
+                                None,
+                                |snapshot| {
+                                    snapshot.metrics.trades_observed += 1;
+                                },
+                            );
+
                             let mut risk = self.risk_manager.lock().await;
-                            
+
                             if !risk.can_trade(&self.config) {
                                 warn!("Risk limits exceeded, skipping trade from {}", trade.from);
+                                reporter.warning(
+                                    "Risk limits exceeded",
+                                    format!("skip trade from={} market={}", trade.from, trade.market_id),
+                                );
                                 continue;
                             }
 
                             info!("Processing smart trade event: {:?}", trade);
 
                             match self.copier.copy(&trade).await {
-                                Ok(profit_dec) => {
-                                    let profit = profit_dec.to_f64().unwrap_or(0.0);
-                                    let size_f64 = trade.size_usd.to_f64().unwrap_or(0.0);
-                                    let copied_notional = size_f64 * self.config.strategy.copy_ratio;
-                                    
+                                Ok(outcome) => {
+                                    let copied_notional = outcome.copied_notional_usd.to_f64().unwrap_or(0.0);
                                     risk.update_exposure(copied_notional);
-                                    risk.update_pnl(profit);
-                                    
+
+                                    if let Some(realized_pnl) = outcome.realized_pnl {
+                                        let pnl = realized_pnl.to_f64().unwrap_or(0.0);
+                                        risk.update_pnl(pnl);
+                                        total_realized_pnl += pnl;
+                                    }
+
                                     info!(
-                                        "Risk updated: market={} copied_notional=${:.2} total_position=${:.2}",
+                                        "Risk updated: market={} copied_notional=${:.2} shares={} total_position=${:.2} simulated={} order_id={:?}",
                                         trade.market_id,
                                         copied_notional,
-                                        risk.total_position_value()
+                                        outcome.share_size,
+                                        risk.total_position_value(),
+                                        outcome.simulated,
+                                        outcome.order_id
                                     );
-                                    
+
                                     trades_copied += 1;
-                                    total_pnl += profit;
-                                    info!("Copied {} trades, total PnL: ${}", trades_copied, total_pnl);
+                                    info!(
+                                        "Copied {} trades, realized PnL: ${}",
+                                        trades_copied,
+                                        total_realized_pnl
+                                    );
+
+                                    reporter.update(
+                                        PaperEventKind::TradeCopied,
+                                        if outcome.simulated {
+                                            "Paper trade copied"
+                                        } else {
+                                            "Trade copied"
+                                        },
+                                        format!(
+                                            "market={} copied_notional=${:.2} shares={} simulated={} total_position=${:.2}",
+                                            trade.market_id,
+                                            copied_notional,
+                                            outcome.share_size,
+                                            outcome.simulated,
+                                            risk.total_position_value()
+                                        ),
+                                        None,
+                                        outcome.realized_pnl.and_then(|value| value.to_f64()),
+                                        |snapshot| {
+                                            snapshot.metrics.trades_executed += 1;
+                                            if outcome.simulated {
+                                                snapshot.metrics.simulated_orders += 1;
+                                            }
+                                            snapshot.metrics.daily_pnl_usd = risk.daily_pnl;
+                                            snapshot.metrics.total_pnl_usd = total_realized_pnl;
+                                            snapshot.metrics.exposure_usd = risk.total_position_value();
+                                        },
+                                    );
                                 }
                                 Err(e) => {
                                     warn!("Failed to copy trade: {}", e);
+                                    reporter.error(
+                                        "Trade copy failed",
+                                        format!("market={} error={}", trade.market_id, e),
+                                    );
                                 }
                             }
                         }
                         None => {
                             warn!("Trade event channel closed");
+                            reporter.warning("Trade channel closed", "monitor channel closed unexpectedly");
                             break;
                         }
                     }
@@ -132,9 +177,13 @@ impl Follower {
         }
 
         info!(
-            "Follow Trader stopped. Copied: {} PnL: ${}",
-            trades_copied, total_pnl
+            "Follow Trader stopped. Copied: {} Realized PnL: ${}",
+            trades_copied, total_realized_pnl
         );
+        reporter.stop(format!(
+            "copied_trades={} realized_pnl=${:.2}",
+            trades_copied, total_realized_pnl
+        ));
         Ok(())
     }
 
@@ -158,7 +207,7 @@ async fn main() -> Result<()> {
     let config_path = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "config/follow-trade.toml".to_string());
-    
+
     let config = Config::load(&config_path).context("Failed to load config")?;
     info!(
         "Config loaded: rpc_url={} mode={:?} environment={:?} live_ack={} fallback_to_paper={}",
@@ -171,4 +220,11 @@ async fn main() -> Result<()> {
 
     let mut follower = Follower::new(config)?;
     follower.run().await
+}
+
+fn run_mode(mode: ExecutionMode) -> RunMode {
+    match mode {
+        ExecutionMode::Paper => RunMode::Paper,
+        ExecutionMode::Live => RunMode::Live,
+    }
 }
